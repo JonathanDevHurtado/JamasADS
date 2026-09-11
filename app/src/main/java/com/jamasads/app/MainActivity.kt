@@ -85,7 +85,8 @@ class MainActivity : Activity() {
 
     /** Handler que mantiene el video reproduciendo mientras la app esta en background.
      *  Ejecuta forcePlay() desde Kotlin (no afectado por la suspension de JS de Chromium)
-     *  cada 3 segundos para contrarrestar el pause automatico de YouTube. */
+     *  cada 5 segundos para contrarrestar el pause automatico de YouTube.
+     *  Nota: el watchdog ya fuerza play cada 2s, este es un fallback Kotlin-side. */
     private val bgKeepAliveRunnable = object : Runnable {
         override fun run() {
             if (serviceBound && backgroundService?.isPlaying == true && ::webView.isInitialized) {
@@ -96,7 +97,7 @@ class MainActivity : Activity() {
                         "return 'ok';})()"
                 ) { }
             }
-            mainHandler.postDelayed(this, 3000)
+            mainHandler.postDelayed(this, 5000)
         }
     }
 
@@ -108,7 +109,8 @@ class MainActivity : Activity() {
     private var lastShortsState = false
 
     /** Monitor de memoria: ejecuta GC proactivo si el heap supera el 85%.
-     *  Previene OOM durante operaciones pesadas (recreateWebView, compilacion de filtros). */
+     *  Previene OOM durante operaciones pesadas (recreateWebView, compilacion de filtros).
+     *  Intervalo: 30 segundos para no saturar el main thread con GC calls. */
     private val memoryMonitorRunnable = object : Runnable {
         override fun run() {
             val rt = Runtime.getRuntime()
@@ -119,7 +121,7 @@ class MainActivity : Activity() {
                 Log.w(Config.TAG, "Memoria alta: ${pct}% (${used/1048576}/${max/1048576} MB), GC forzado")
                 System.gc()
             }
-            mainHandler.postDelayed(this, 10000)
+            mainHandler.postDelayed(this, 30000)
         }
     }
 
@@ -143,9 +145,8 @@ class MainActivity : Activity() {
     }
 
     /** Vigila la URL aunque la navegacion sea SPA (pushState, sin recargar la
-     *  pagina): al entrar/salir de Shorts re-aplica el padding de insets, porque
-     *  el callback de URL (onPageCommitVisible) y el listener de insets solo se
-     *  disparan en cargas reales de pagina, no al cambiar dentro de la SPA. */
+     *  pagina): al entrar/salir de Shorts re-aplica el padding de insets.
+     *  Intervalo: 1 segundo para no saturar el main thread. */
     private val urlWatcher = object : Runnable {
         override fun run() {
             val shorts = isShortsPage()
@@ -153,16 +154,18 @@ class MainActivity : Activity() {
                 lastShortsState = shorts
                 applyInsetsPadding()
             }
-            mainHandler.postDelayed(this, 500)
+            mainHandler.postDelayed(this, 1000)
         }
     }
 
     /** Checker periodico del estado de reproduccion: actualiza la notificacion
-     *  cada 2 segundos para que el servicio sepa si el video esta reproduciendose. */
+     *  cada 5 segundos para que el servicio sepa si el video esta reproduciendose.
+     *  Nota: el watchdog ya reporta via JamasBridge cada 2s, este checker es
+     *  un fallback por si el bridge no responde (ej: pagina cargando). */
     private val playbackWatcher = object : Runnable {
         override fun run() {
             detectAndReportPlaybackState()
-            mainHandler.postDelayed(this, 2000)
+            mainHandler.postDelayed(this, 5000)
         }
     }
 
@@ -555,7 +558,7 @@ class MainActivity : Activity() {
         if (::webView.isInitialized) {
             webView.evaluateJavascript("window.__jamasBg=true", null)
             // Iniciar keepalive desde Kotlin (no depende de JS de Chromium)
-            mainHandler.postDelayed(bgKeepAliveRunnable, 3000)
+            mainHandler.postDelayed(bgKeepAliveRunnable, 5000)
         }
     }
 

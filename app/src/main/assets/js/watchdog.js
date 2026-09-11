@@ -74,16 +74,18 @@
     adBreakHeartbeatParams: 1, adBreakEndpoint: 1
   };
 
-  function pruneAds(obj) {
+  function pruneAds(obj, depth) {
+    if (depth === undefined) { depth = 0; }
+    if (depth > 12) { return; }
     if (obj === null || typeof obj !== 'object') { return; }
     if (Object.prototype.toString.call(obj) === '[object Array]') {
-      for (var i = 0; i < obj.length; i++) { pruneAds(obj[i]); }
+      for (var i = 0; i < obj.length; i++) { pruneAds(obj[i], depth + 1); }
       return;
     }
     for (var k in obj) {
       if (!Object.prototype.hasOwnProperty.call(obj, k)) { continue; }
       if (AD_KEYS[k]) { delete obj[k]; }
-      else { pruneAds(obj[k]); }
+      else { pruneAds(obj[k], depth + 1); }
     }
   }
 
@@ -179,10 +181,13 @@
   // Al abrir un video directamente, YouTube incrusta la respuesta del player
   // en la pagina como ytInitialPlayerResponse/ytInitialData (literal JS, no
   // pasa por JSON.parse). Se podan los datos de anuncio de esos objetos.
+  var globalsPruned = false;
   function pruneGlobals() {
+    if (globalsPruned) { return; }
     try {
       if (window.ytInitialPlayerResponse) { pruneAds(window.ytInitialPlayerResponse); }
       if (window.ytInitialData) { pruneAds(window.ytInitialData); }
+      globalsPruned = true;
     } catch (e) {}
   }
 
@@ -320,7 +325,7 @@
   // MutationObserver: disparaba un querySelectorAll sobre todo el DOM en cada
   // mutacion de YouTube (las listas virtuales mutan constantemente) y saturada
   // el hilo principal impidiendo que se renderizaran las filas horizontales.
-  setInterval(function () { nuke(); skipAd(); pruneGlobals(); }, 350);
+  setInterval(function () { nuke(); skipAd(); pruneGlobals(); }, 2000);
 
   document.addEventListener('DOMContentLoaded', function () { nuke(); pruneGlobals(); });
   nuke();
