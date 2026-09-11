@@ -1,0 +1,57 @@
+# Built application files
+*.apk
+*.ap_
+*.aab
+*.idsig
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+
+# Gradle files
+.gradle/
+build/
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Android Studio
+*.iml
+.idea/
+.DS_Store
+
+# Signing files
+*.jks
+*.keystore
+signing.properties
+
+# Crash logs
+crashes/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+
+# Kotlin sessions
+.kotlin/
+
+# Github folder (se maneja por separado)
+Github/
+
+# Otros
+Bugs Reports Users/
+Logos Copy Segurity/
+PORQUE_PESA_MENOS_DE_2MB.md
