@@ -2,7 +2,6 @@
 *.apk
 *.ap_
 *.aab
-*.idsig
 
 # Files for the ART/Dalvik VM
 *.dex
@@ -44,11 +43,3 @@ node_modules/
 
 # Logs
 *.log
-
-# Kotlin sessions
-.kotlin/
-
-# Otros
-Bugs Reports Users/
-Logos Copy Segurity/
-PORQUE_PESA_MENOS_DE_2MB.md
