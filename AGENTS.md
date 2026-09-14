@@ -14,21 +14,40 @@ Reproducción en segundo plano con notificación interactiva (MediaSession).
 ## Comandos
 
 ```bash
-cd /home/linius/Descargas/UtubeOrigins
-export JAVA_HOME=/home/linius/android-dev/jdk17
-export ANDROID_HOME=/home/linius/android-dev/sdk
+cd /home/linius/Programador/Programas\ Personales\ Mios/JamasADS
+source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk use java 17.0.13-tem
+export ANDROID_HOME="$HOME/android-sdk"
 
 # tests + lint + APK release firmado (comando completo y obligatorio al terminar)
 ./gradlew :app:testReleaseUnitTest :app:lintRelease assembleRelease
+
+# build rapido (sin tests)
+./gradlew :app:assembleRelease
 
 # validar sintaxis del watchdog JS
 node --check app/src/main/assets/js/watchdog.js
 ```
 
 Al terminar una versión: copiar `app/build/outputs/apk/release/app-release.apk`
-a `UtubeOrigin-vX.Y.apk` (en la raíz), borrar el APK anterior y verificar firma
-con `apksigner` de build-tools 35.0.0. Sin dispositivo ni emulador: **el usuario
-instala y prueba cada APK**.
+a `Github/apks/JamasADS-vX.Y.apk`, borrar el APK anterior y verificar firma
+con `apksigner` de build-tools 35.0.0. Firma:
+
+Las credenciales de firma estan en `signing.properties` (no versionado). El
+build de release firma automaticamente si ese archivo existe. Para firmar a mano
+desde la linea de comandos, lee las claves de ahi en vez de escribirlas aqui:
+
+```bash
+"$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
+  --ks keystore/utubeorigin.jks \
+  --ks-pass "pass:$(grep storePassword signing.properties | cut -d= -f2)" \
+  --key-pass "pass:$(grep keyPassword signing.properties | cut -d= -f2)" \
+  --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
+  app/build/outputs/apk/release/app-release.apk
+```
+
+Dispositivo de pruebas: `qc5lnnwwyhy5tcm7` (Xiaomi/MIUI Android 13+).
+**Sin emulador**: el usuario instala y prueba cada APK.
+**adb input commands**: bloqueados por SecurityException en este dispositivo.
 
 ## Arquitectura (3 capas de bloqueo)
 
@@ -74,13 +93,55 @@ instala y prueba cada APK**.
   (vars `pipDownX`/`pipDownY`/`pipDownTime` en MainActivity).
 - El switch del panel ⚙ solo activa/desactiva la Capa 1 (red). CSS y watchdog
   actúan siempre (por eso no se ven anuncios con el bloqueador OFF).
+- **CSS del watchdog acotado por página**: `enhancements.css` va en `#jamas-css`
+  (lo inyecta Kotlin). Los fixes SOLO de watch (ocultar header, subir el player)
+  van en `#jamas-watch-css` y **siempre** prefijados con `html.jamas-page-watch`.
+  El watchdog añade esa clase a `<html>`/`<body>`/`ytm-app`/`ytd-app` según la
+  ruta (con detección de `pushState`/`popstate`). Nunca ocultar el logo/header
+  globalmente: en home/search debe verse.
+- **Hueco negro en watch**: en `m.youtube.com` el contenedor del player es
+  `position:fixed` con `top:48px`. El fix es subir ese ancestro a `top:0`
+  (recorriendo los padres del `<video>`) y ocultar el header fijo de ~48px de
+  `ytm-app`. No usar negative margins sobre `body`/`html` (tapaba la descripción).
 - El compilador de filtros debe **descartar** las reglas con opciones `replace=`,
   `csp=`, `removeparam`, `badfilter` (no son bloqueos; compilarlas como bloqueo
   rompe la reproducción) y los scriptlets `+js(...)` (no son CSS). Esto está
   cubierto por `FilterCompilerTest` (12 tests).
 - Versionado: `versionCode`/`versionName` en `app/build.gradle.kts`
-  (actual: 17 / "2.6"). Firma con `signing.properties` + `keystore/utubeorigin.jks`
-  (alias `utubeorigin`, pass `utubeorigin2026`).
+  (actual: 32 / "3.0"). Firma con `signing.properties` + `keystore/utubeorigin.jks`
+- **La barra de acciones del watch se re-renderiza**: YouTube borra las clases
+  `jamas-ab-*`. Se re-aplica al instante con `observeWatchBar()` (MutationObserver
+  **solo childList**, throttle 120 ms, sin observar atributos → sin bucle), que
+  además observa el **padre** de la barra (si YouTube la reemplaza entera). Al
+  ocultar extras, **nunca** ocultar un elemento que contenga un `<button>` salvo
+  el botón IA "Preguntar" (si no, dislike/compartir desaparecen). **Tampoco
+  ocultar elementos por "no tener `<button>`" (`!cb`)**: durante un re-render
+  (p. ej. al rotar) dislike/compartir se quedan un instante sin botón y quedarían
+  ocultos con `display:none !important` inline para siempre (bug de beta.8,
+  arreglado en beta.9). Ante `resize` y `orientationchange` también se re-aplica.
+- **Giro del móvil (bug real de YouTube)**: al girar a **horizontal** YouTube
+  **elimina Dislike, IA y Más del DOM** de la barra (deja Like y Compartir) y al
+  volver a **vertical NO los repone**; el JS no puede recuperar nodos borrados.
+  Solución (`jamasOnOrientation()` en el watchdog): al detectar horizontal→
+  vertical, si falta el botón de "No me gusta" (o hay <2 `button-view-model`), se
+  **recarga la página en la misma posición del vídeo** (`URL` +
+  `searchParams.set('t', currentTime)`). Guardado: solo una vez por giro y solo en
+  `watch`. Se reproduce con `adb shell wm user-rotation lock 1` / `lock 0`.
+- **Player/masthead por CSS, no por JS repetido**: `.player-container{top:0}` y
+  `ytm-masthead{z-index:1}` (renderizado, no `display:none`) con `!important`. El
+  player (`z=2`) tapa el masthead igual (sin hueco) pero no se rompen componentes
+  internos de YouTube. El JS `fixWatchLayout` queda solo como respaldo.
+- **El buscador no se puede abrir por código**: YouTube ignora los clics
+  sintéticos (`.click()` y toda la secuencia de punteros exigen `isTrusted`) y el
+  botón vive en el topbar (`ytm-mobile-topbar-renderer`), tapado por el player en
+  watch. La pestaña "Buscar" usa un **diálogo nativo** (`AlertDialog` + `EditText`,
+  `showSearchDialog()`) y navega a `https://m.youtube.com/results?search_query=<q>`.
+- **No mover nodos del DOM de YouTube**: al mover los botones de la barra de
+  acciones a contenedores propios, su render deja de dibujar dislike/compartir.
+  El layout se hace SOLO con CSS Grid (`repeat(6, minmax(0,1fr))` + `grid-column`
+  por clase en `enhancements.css`); el JS solo añade clases, contadores y
+  `bindTileClick()` (reenvía el clic de la tarjeta al `<button>`).
+  (alias y passwords en `signing.properties`, no versionado).
 - **Los ajustes de UI dependientes de la página (padding de insets de Shorts,
   etc.) deben detectar también la navegación SPA de YouTube** (`history.pushState`):
   ni `onPageCommitVisible` ni los insets se disparan ahí. MainActivity tiene un
@@ -105,20 +166,77 @@ instala y prueba cada APK**.
 JamasADS/
 ├── app/src/main/java/com/jamasads/app/
 │   ├── Config.kt              # HOME_URL, CHROME_UA, TAG, FILE_CHOOSER_REQ
-│   ├── MainActivity.kt        # UI, WebView, insets, mini-burbuja in-app, ajustes, crash dialog, servicio segundo plano
+│   ├── SplashActivity.kt      # Splash animado con logo Bubu
+│   ├── MainActivity.kt        # UI, WebView, bottom nav nativa, insets, mini-burbuja, ajustes, crash dialog, servicio 2° plano
 │   ├── CrashCatcher.kt        # guarda logs de crash y muestra diálogo
 │   ├── media/BackgroundMediaService.kt  # servicio en 2° plano con MediaSession y notificación
 │   ├── adblock/{Filter,FilterCompiler,AdBlocker}.kt
-│   └── web/YtWebViewClient.kt # shouldInterceptRequest, inyección watchdog, renderer crash
-├── app/src/main/assets/filters/{easylist,easyprivacy,ublock-filters,quick-fixes,youtube}.txt
-├── app/src/main/assets/js/watchdog.js
+│   └── web/YtWebViewClient.kt # shouldInterceptRequest, inyección watchdog+CSS, renderer crash
+├── app/src/main/assets/
+│   ├── filters/{easylist,easyprivacy,ublock-filters,quick-fixes,youtube}.txt
+│   ├── js/watchdog.js         # watchdog anti-anuncios + background + glass UI
+│   └── css/enhancements.css   # glassmorphism + tema nativo YouTube
 ├── app/src/test/java/.../adblock/FilterCompilerTest.kt   # 12 tests
-├── DOCUMENTACION.md          # doc completa del usuario
-└── REPORTE.md                # sistema de incidencias
+├── Github/
+│   ├── apks/                  # APKs firmados por versión (versionados)
+│   ├── logs/                  # changelogs por versión
+│   └── versiones/             # historial de versiones
+├── .github/workflows/build.yml  # CI: tests + lint + build en tags v*
+├── README.md                  # portada del repo (GitHub)
+├── CHANGELOG.md               # changelog Keep a Changelog
+├── LICENSE                    # MIT
+├── SECURITY.md / CONTRIBUTING.md / CODE_OF_CONDUCT.md
+├── DOCUMENTACION.md           # doc completa del usuario
+├── REPORTE.md                 # sistema de incidencias
+└── AGENTS.md                  # este archivo
 ```
 
 ## Estado actual
 
-v2.7 (code 18) - Optimización de startup: watchdog.js y CSS cacheados en memoria,
-handlers diferidos (urlWatcher 3s, playbackWatcher 5s, servicio 2s), splash screen
-via theme (splash_background.xml), botón "Compartir" en crash dialog.
+v3.0 (code 32) - versión estable (UI nativa + fixes del watch):
+- **Estructura del repo**: README, LICENSE, CHANGELOG, SECURITY, CONTRIBUTING, CODE_OF_CONDUCT y `.github/workflows/build.yml` en la raíz; `Github/` queda para `apks/`, `logs/` y `versiones/`
+- **Giro del móvil**: al girar a horizontal YouTube **borra Dislike/Más del DOM** y no los repone al volver a vertical → al volver a vertical se **recarga la página en la misma posición del vídeo** (`&t=<s>`) para re-renderizar la barra completa
+- **Masthead** `z-index:1` (renderizado, ya no `display:none`): el player lo tapa sin hueco y no se rompen componentes de YouTube
+- **Buscador nativo**: pestaña "Buscar" → `AlertDialog` con `EditText` → `/results?search_query=<q>` (el click JS no sirve: YouTube exige gesto real)
+- **Ocultación segura**: solo `<script>` y botón IA; observer de la barra y su padre
+- Version anterior (v3.0-beta.9, code 30) - fix rotación (parcial) + buscador nativo:
+- Se quitó la ocultación de hijos sin `<button>` (`!cb`); listeners `resize`/`orientationchange` + observer del padre de la barra
+- Version anterior (v3.0-beta.8, code 29) - auditoría del watch (estabilidad):
+- **Barra de acciones**: grid de 6 columnas; `observeWatchBar()` (MutationObserver acotado, throttle 120 ms) re-aplica las clases al instante tras los re-render de YouTube. Ocultación segura (solo `<script>` y botón IA "Preguntar")
+- **Player**: `top:0`; **Metadata** con más aire (`padding:16px 14px 8px`); **chips de relacionados** `position:static` (no se superponen)
+- **Contador de dislikes**: Return YouTube Dislike; like desde el `aria-label`
+- **Audio siempre activo**: `forceAudio()` + CSS oculta `.ytp-unmute`
+- Version anterior (v3.0-beta.7, code 28) - like pegado a la izquierda + más aire en el 2x2:
+- **Watch, barra de acciones**: grid de **6 columnas** `repeat(6, minmax(0,1fr))`; fila 1 avatar(1) | nombre+subs(2-4) | Suscribirse(5-6); fila 2 `[Like 1-3][Dislike 4-6]`; fila 3 `[Compartir 1-3][Más 4-6]`. **No se mueve ningún nodo de YouTube**
+- **`.jamas-ab-tile`**: `width:100%; margin:0; box-sizing:border-box; justify-self:stretch` (el like de YouTube trae `margin-left:auto` + `fit-content` y se pegaba a la derecha). `row-gap:14px` separa el 2x2 del canal
+- **Clic en toda la tarjeta**: `bindTileClick()` reenvía el clic (incluido el contador `::after`) al `<button>` interno
+- **Contador de dislikes**: `updateDislikeCount()` (Return YouTube Dislike). Like desde el `aria-label`
+- **Audio siempre activo**: `forceAudio()` (`video.muted=false` cada 700 ms) + CSS oculta `.ytp-unmute`
+- Version anterior (v3.0-beta.6, code 27) - layout de la barra de acciones estable (CSS puro):
+- **Watch, barra de acciones**: grid de **6 columnas** `repeat(6, minmax(0,1fr))` (CSS en `enhancements.css`): fila 1 avatar(1) | nombre+subs(2-4) | Suscribirse(5-6); fila 2 `[Like 1-3][Dislike 4-6]`; fila 3 `[Compartir 1-3][Más 4-6]`. **No se mueve ningún nodo de YouTube** (moverlos hacía que su render dejara de dibujar dislike/compartir)
+- **Clic en toda la tarjeta**: `bindTileClick()` reenvía el clic (incluido el contador `::after`) al `<button>` interno
+- **Contador de dislikes**: `updateDislikeCount()` (Return YouTube Dislike). Like desde el `aria-label`
+- **Audio siempre activo**: `forceAudio()` (`video.muted=false` cada 700 ms) + CSS oculta `.ytp-unmute`
+- Version anterior (v3.0-beta.5, code 26) - bloque de acciones 2x2 + dislike real:
+- **Watch, bloque 2x2**: `enhanceWatchActions()` rehace la barra como grid de 4 columnas: fila 1 canal (avatar + nombre + suscriptores + Suscribirse), fila 2 `[Like][Dislike]`, fila 3 `[Compartir][Más]` (cada tarjeta `span 2`). Radio 16 px
+- **Contador de dislikes**: YouTube ya no los publica → `updateDislikeCount()` consulta la API pública de **Return YouTube Dislike** una vez por video (`data-count` + `data-ryd`). **No** borrar ese `data-count` desde `enhanceWatchActions()` (parpadeaba)
+- **Audio siempre activo**: `forceAudio()` (`video.muted=false` cada 700 ms) + CSS oculta `.ytp-unmute`
+- **Icono de like Lottie**: flex centrado + `svg{position:static;transform:none}` para que no se corte
+- Version anterior (v3.0-beta.4, code 25) - barra de acciones moderna + audio siempre activo:
+- **Watch, barra de acciones**: `enhanceWatchActions()` (watchdog) rehace `.slim-video-action-bar-actions` con CSS Grid en 2 filas: canal (avatar + nombre + suscriptores + Suscribirse) y 4 tarjetas compactas (Like con contador del `aria-label`, Dislike, Compartir, Más). Oculta extras (sparkle IA). No mueve el DOM de YouTube (solo añade clases + `grid-column`), así los botones siguen funcionando
+- **Icono de like Lottie**: se cortaba por `transform: translate(-50%,-50%)` al colapsar el botón → se fuerza flex centrado en la cadena y `svg{position:static;transform:none}`
+- **Audio siempre activo**: `forceAudio()` pone `video.muted=false` cada 700 ms; se oculta el botón blanco `.ytp-unmute`. `mediaPlaybackRequiresUserGesture=false` en el WebView
+- Tarjetas compactas (36 px, radio 11, iconos 22 px); comentarios (teaser/carrusel) con padding, radio y avatar circular
+- Version anterior (v3.0-beta.3, code 24) - UI nativa de la página de video (watch):
+- **Watch mobile**: `enhancements.css` usaba selectores de escritorio (`ytd-*`) que no aplican en `m.youtube.com` (maqueta `ytm-*` / `slim-video-*`). Nueva sección acotada a `html.jamas-page-watch`: título a 2 líneas, barra de acciones "pill" glass, Suscribirse rojo pill, like/dislike/compartir redondeados, avatar circular, comentarios y relacionados como tarjetas
+- Version anterior (v3.0-beta.2, code 23) - reparación + UI + auditoría + UX:
+- Bottom nav con 5 iconos vectoriales Material (Inicio, Shorts, Buscar, Suscripciones, Biblioteca)
+- **Buscador de la bottom nav funcional**: `button[aria-label*="Buscar"]` abre el overlay de búsqueda de YouTube
+- **Home**: buscador de la barra superior oculto (duplicaba la bottom nav)
+- **Shorts**: logo de YouTube oculto + botón nativo glass "volver a inicio" (casita + flecha, `ic_shorts_home`)
+- **Watch**: fix hueco negro (player `fixed top:48` → `top:0`, header de 48px oculto). Verificado `videoTop=0`
+- CSS del watchdog acotado por página en `#jamas-watch-css` (`html.jamas-page-*`), con detección de SPA
+- Fix `SyntaxError` del regex de videoId; fix conflicto `enhancements.css` (`#jamas-css`)
+- `isVideoFullscreen()` usa `@Volatile isFullscreenReported` del bridge
+- Buenas prácticas: streams con `use`, null-safety NotificationManager, guard `progressBar`, sin `System.gc()`, typo XHR, `skipAd` restaura mute, `injectNoAd` sin JSON inválido, sin MutationObserver costoso, deep-links (`onNewIntent`), logging de consola JS, sin secretos en `AGENTS.md`
+- Modo inmersivo permanente; CSS glassmorphism; background playback (loadUrl fallback + force-play 500ms)

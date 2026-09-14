@@ -18,8 +18,8 @@ android {
         applicationId = "com.jamasads.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 19
-        versionName = "2.8"
+        versionCode = 32
+        versionName = "3.0"
     }
 
     signingConfigs {

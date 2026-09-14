@@ -4,6 +4,9 @@
 *.aab
 *.idsig
 
+# Excepcion: se versiona el APK de release para descarga directa
+!Github/apks/*.apk
+
 # Files for the ART/Dalvik VM
 *.dex
 

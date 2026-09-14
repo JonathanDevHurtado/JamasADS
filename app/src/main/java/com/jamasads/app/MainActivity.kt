@@ -2,6 +2,7 @@ package com.jamasads.app
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.Dialog
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -36,7 +37,9 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
+import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.Switch
@@ -68,7 +71,9 @@ class MainActivity : Activity() {
     private lateinit var webView: WebView
     private lateinit var adBlocker: AdBlocker
     private lateinit var progressBar: ProgressBar
-    private lateinit var settingsButton: TextView
+    private lateinit var settingsButton: ImageView
+    private lateinit var shortsHomeButton: ImageView
+    private lateinit var bottomNav: LinearLayout
 
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
@@ -84,20 +89,26 @@ class MainActivity : Activity() {
     private var lastInsetBottom = 0
 
     /** Handler que mantiene el video reproduciendo mientras la app esta en background.
-     *  Ejecuta forcePlay() desde Kotlin (no afectado por la suspension de JS de Chromium)
-     *  cada 5 segundos para contrarrestar el pause automatico de YouTube.
-     *  Nota: el watchdog ya fuerza play cada 2s, este es un fallback Kotlin-side. */
+     *  Estrategia dual: evaluateJavascript (si Chromium no suspendio) + loadUrl fallback.
+     *  Intervalo 1.5s para ser agresivo contra el pause de YouTube. */
     private val bgKeepAliveRunnable = object : Runnable {
         override fun run() {
-            if (serviceBound && backgroundService?.isPlaying == true && ::webView.isInitialized) {
-                webView.evaluateJavascript(
-                    "(function(){var v=document.querySelector('video');" +
-                        "if(v&&v.paused&&v.currentTime>0&&!v.ended&&!window.__jamasUserPaused){" +
-                        "v.muted=false;v.play().catch(function(){});return 'bg_resume';}" +
-                        "return 'ok';})()"
-                ) { }
+            if (::webView.isInitialized && webView.isAttachedToWindow) {
+                val forcePlayJs = "javascript:(function(){" +
+                    "if(!window.__jamasBg)return;" +
+                    "var v=document.querySelector('video');" +
+                    "if(!v||v.ended)return;" +
+                    "if(window.__jamasUserPaused)return;" +
+                    "if(v.paused){" +
+                    "v.muted=false;v.play().catch(function(){});}" +
+                    "})()"
+                try {
+                    webView.evaluateJavascript(forcePlayJs.removePrefix("javascript:"), null)
+                } catch (_: Exception) {}
+                // loadUrl como fallback si evaluateJavascript esta suspendido
+                try { webView.loadUrl(forcePlayJs) } catch (_: Exception) {}
             }
-            mainHandler.postDelayed(this, 5000)
+            mainHandler.postDelayed(this, 1500)
         }
     }
 
@@ -118,8 +129,8 @@ class MainActivity : Activity() {
             val max = rt.maxMemory()
             val pct = used * 100 / max
             if (pct > 85) {
-                Log.w(Config.TAG, "Memoria alta: ${pct}% (${used/1048576}/${max/1048576} MB), GC forzado")
-                System.gc()
+                // Solo se registra: forzar System.gc() provoca jank (stop-the-world).
+                Log.w(Config.TAG, "Memoria alta: ${pct}% (${used/1048576}/${max/1048576} MB)")
             }
             mainHandler.postDelayed(this, 30000)
         }
@@ -145,8 +156,20 @@ class MainActivity : Activity() {
     }
 
     /** Vigila la URL aunque la navegacion sea SPA (pushState, sin recargar la
-     *  pagina): al entrar/salir de Shorts re-aplica el padding de insets.
-     *  Intervalo: 1 segundo para no saturar el main thread. */
+     *  pagina): al entrar/salir de Shorts re-aplica el padding de insets
+     *  y oculta/muestra la bottom nav y el boton de ajustes.
+     *  Tambien re-oculta las barras del sistema periodicamente para que
+     *  no reaparezcan al cambiar de pagina o reproducir video.
+     *  Intervalo: 2 segundos para no sobrecargar. */
+    /** Estado de pantalla completa reportado por el watchdog via JamasBridge.
+     *  (evaluateJavascript es asincrono, por eso no se puede consultar el DOM
+     *  directamente aqui: el watchdog lo detecta y lo empuja por el bridge.) */
+    @Volatile
+    private var isFullscreenReported = false
+
+    /** Detecta si el video esta en pantalla completa. */
+    private fun isVideoFullscreen(): Boolean = customView != null || isFullscreenReported
+
     private val urlWatcher = object : Runnable {
         override fun run() {
             val shorts = isShortsPage()
@@ -154,7 +177,23 @@ class MainActivity : Activity() {
                 lastShortsState = shorts
                 applyInsetsPadding()
             }
-            mainHandler.postDelayed(this, 1000)
+            // Ocultar/mostrar bottom nav segun Shorts O fullscreen
+            if (::bottomNav.isInitialized) {
+                val hideNav = shorts || isVideoFullscreen()
+                bottomNav.visibility = if (hideNav) View.GONE else View.VISIBLE
+            }
+            // Ocultar el boton de ajustes en Shorts Y en paginas de video
+            if (::settingsButton.isInitialized) {
+                val inVideo = shorts || isVideoPage()
+                settingsButton.visibility = if (inVideo) View.GONE else View.VISIBLE
+            }
+            // Boton "volver a inicio" (casita): solo en Shorts
+            if (::shortsHomeButton.isInitialized) {
+                shortsHomeButton.visibility = if (shorts) View.VISIBLE else View.GONE
+            }
+            // Re-ocultar barras del sistema cada 2 segundos
+            hideSystemBars()
+            mainHandler.postDelayed(this, 2000)
         }
     }
 
@@ -199,11 +238,11 @@ class MainActivity : Activity() {
             max = 100
             isIndeterminate = false
             progressTintList = ColorStateList.valueOf(0xFFFF0000.toInt())
-            progressBackgroundTintList = ColorStateList.valueOf(0x33000000.toInt())
+            progressBackgroundTintList = ColorStateList.valueOf(0x00000000.toInt())
         }
         root.addView(progressBar, FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
-            dp(3)
+            dp(2)
         ).apply { gravity = Gravity.TOP })
 
         root.addView(webView, FrameLayout.LayoutParams(
@@ -211,22 +250,24 @@ class MainActivity : Activity() {
             ViewGroup.LayoutParams.MATCH_PARENT
         ))
 
-        settingsButton = TextView(this).apply {
-            text = "\u2699\uFE0E"
-            textSize = 20f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(0x99000000.toInt())
-                setStroke(dp(1), 0x44FFFFFF.toInt())
-            }
-            setOnClickListener { showSettings() }
-        }
+        settingsButton = createSettingsButton()
         root.addView(settingsButton, FrameLayout.LayoutParams(dp(44), dp(44)).apply {
             gravity = Gravity.BOTTOM or Gravity.END
             setMargins(0, 0, dp(10), dp(58))
         })
+
+        // Boton glass de "volver a inicio" para Shorts (reemplaza el logo de YouTube).
+        shortsHomeButton = createShortsHomeButton()
+        root.addView(shortsHomeButton, FrameLayout.LayoutParams(dp(44), dp(44)).apply {
+            gravity = Gravity.TOP or Gravity.START
+            setMargins(dp(10), dp(10), 0, 0)
+        })
+        shortsHomeButton.visibility = View.GONE
+
+        bottomNav = createBottomNav()
+        root.addView(bottomNav, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(56)
+        ).apply { gravity = Gravity.BOTTOM })
 
         setupMiniPlayer()
         setupInsets()
@@ -234,8 +275,9 @@ class MainActivity : Activity() {
 
         YtWebViewClient.preloadAssets(this)
 
-        if (intent?.data != null) {
-            webView.loadUrl(intent!!.data.toString())
+        val deepLink = intent?.data?.toString()
+        if (deepLink != null) {
+            webView.loadUrl(deepLink)
         } else {
             webView.loadUrl(Config.HOME_URL)
         }
@@ -266,13 +308,17 @@ class MainActivity : Activity() {
     }
 
     private fun handleMediaActionFromService(action: String) {
-        if (!::webView.isInitialized) return
+        if (!::webView.isInitialized || !webView.isAttachedToWindow) {
+            Log.w(Config.TAG, "handleMediaAction($action): WebView no disponible")
+            return
+        }
         try {
             when (action) {
                 "play" -> {
                     webView.evaluateJavascript(
-                        "(function(){window.__jamasUserPaused=false;var v=document.querySelector('video');" +
-                            "if(v){v.play().catch(function(){});return 'ok';}return 'no';})()"
+                        "(function(){window.__jamasUserPaused=false;window.__jamasBg=false;" +
+                            "var v=document.querySelector('video');" +
+                            "if(v){v.muted=false;v.play().catch(function(){});return 'ok';}return 'no';})()"
                     ) { result ->
                         Log.d(Config.TAG, "Play desde notificacion: $result")
                     }
@@ -406,20 +452,23 @@ class MainActivity : Activity() {
             } catch (e: Exception) {
                 // Log basico sin stack trace
             }
-            // GC explicito antes de crear la nueva WebView
-            System.gc()
-            Thread.sleep(100)
-            System.gc()
-            val fresh = createWebView()
-            root.addView(
-                fresh, 0,
-                FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-            )
-            webView = fresh
-            fresh.loadUrl(lastUrl)
+            // Usar Handler.postDelayed en vez de Thread.sleep para no bloquear el main thread
+            mainHandler.postDelayed({
+                try {
+                    val fresh = createWebView()
+                    root.addView(
+                        fresh, 0,
+                        FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                    )
+                    webView = fresh
+                    fresh.loadUrl(lastUrl)
+                } catch (e: Exception) {
+                    Log.w(Config.TAG, "fallo recreate: ${e.message}")
+                }
+            }, 100)
         } catch (e: Exception) {
             // Log basico sin stack trace para evitar OOM
             Log.w(Config.TAG, "fallo recreate: ${e.message}")
@@ -436,7 +485,7 @@ class MainActivity : Activity() {
             view ?: return
             customView = view
             customViewCallback = callback
-            (findViewById<ViewGroup>(android.R.id.content))?.addView(
+            root.addView(
                 view,
                 FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -444,6 +493,8 @@ class MainActivity : Activity() {
                 )
             )
             settingsButton.visibility = View.GONE
+            if (::shortsHomeButton.isInitialized) shortsHomeButton.visibility = View.GONE
+            bottomNav.visibility = View.GONE
             hideSystemBars()
         }
 
@@ -453,6 +504,14 @@ class MainActivity : Activity() {
 
         override fun onPermissionRequest(request: PermissionRequest?) {
             request?.grant(request.resources)
+        }
+
+        /** Logs de consola de la pagina (depuracion del watchdog). */
+        override fun onConsoleMessage(msg: android.webkit.ConsoleMessage): Boolean {
+            if (msg.messageLevel() != android.webkit.ConsoleMessage.MessageLevel.LOG) {
+                Log.d(Config.TAG, "JS[${msg.messageLevel()}] ${msg.message()} @ ${msg.sourceId()}:${msg.lineNumber()}")
+            }
+            return true
         }
 
         @Suppress("DEPRECATION")
@@ -479,8 +538,10 @@ class MainActivity : Activity() {
         }
 
         override fun onProgressChanged(view: WebView?, newProgress: Int) {
-            progressBar.progress = newProgress
-            progressBar.visibility = if (newProgress < 100) View.VISIBLE else View.GONE
+            if (::progressBar.isInitialized) {
+                progressBar.progress = newProgress
+                progressBar.visibility = if (newProgress < 100) View.VISIBLE else View.GONE
+            }
             if (newProgress == 100) {
                 detectAndReportPlaybackState()
             }
@@ -488,7 +549,7 @@ class MainActivity : Activity() {
     }
 
     private fun detectAndReportPlaybackState() {
-        if (!::webView.isInitialized) return
+        if (!::webView.isInitialized || !webView.isAttachedToWindow) return
         try {
             webView.evaluateJavascript(
                 "(function(){var v=document.querySelector('video');" +
@@ -503,7 +564,7 @@ class MainActivity : Activity() {
                     "if(t&&t.textContent.trim()){title=t.textContent.trim();}" +
                     "else{var dt=document.title||'';var si=dt.indexOf(' - ');title=si>0?dt.substring(0,si).trim():dt.trim();}" +
                     "var th='';try{" +
-                    "var um=location.pathname.match(/\\\\/(?:shorts\\\\/|watch\\\\?v=|v\\\\/)([\\\\w-]{11})/);" +
+                    "var um=location.pathname.match(/\\/(?:shorts\\/|watch\\?v=|v\\/)([\\w-]{11})/);" +
                     "var vid=um?um[1]:null;" +
                     "if(!vid){var q=new URLSearchParams(location.search).get('v');if(q&&q.length===11)vid=q;}" +
                     "if(vid)th='https://i.ytimg.com/vi/'+vid+'/hqdefault.jpg';" +
@@ -555,23 +616,50 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
-        if (::webView.isInitialized) {
-            webView.evaluateJavascript("window.__jamasBg=true", null)
-            // Iniciar keepalive desde Kotlin (no depende de JS de Chromium)
-            mainHandler.postDelayed(bgKeepAliveRunnable, 5000)
+        Log.d(Config.TAG, "onPause: iniciando keepalive de background")
+        if (::webView.isInitialized && webView.isAttachedToWindow) {
+            // Forzar play inmediatamente desde Kotlin
+            try {
+                webView.evaluateJavascript(
+                    "window.__jamasBg=true;" +
+                        "(function(){var v=document.querySelector('video');" +
+                        "if(v&&v.paused&&!v.ended&&!window.__jamasUserPaused){" +
+                        "v.muted=false;v.play().catch(function(){});return 'bg_start';}return 'ok';})()"
+                , null)
+            } catch (_: Exception) {}
+            // loadUrl como fallback inmediato
+            try {
+                webView.loadUrl("javascript:window.__jamasBg=true;" +
+                    "(function(){var v=document.querySelector('video');" +
+                    "if(v&&v.paused&&!v.ended&&!window.__jamasUserPaused){" +
+                    "v.muted=false;v.play().catch(function(){})})()")
+            } catch (_: Exception) {}
+            // Iniciar keepalive cada 1.5s
+            mainHandler.removeCallbacks(bgKeepAliveRunnable)
+            mainHandler.postDelayed(bgKeepAliveRunnable, 1500)
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val deepLink = intent.data?.toString() ?: return
+        if (::webView.isInitialized) webView.loadUrl(deepLink)
     }
 
     override fun onResume() {
         super.onResume()
+        // Re-activar inmersivo al volver a la app
+        hideSystemBars()
         mainHandler.removeCallbacks(bgKeepAliveRunnable)
-        if (::webView.isInitialized) {
+        if (::webView.isInitialized && webView.isAttachedToWindow) {
             webView.evaluateJavascript("window.__jamasBg=false;window.__jamasUserPaused=false", null)
             webView.onResume()
             // Si el servicio dice que esta reproduciendo, reanudar el video
             if (serviceBound && backgroundService?.isPlaying == true) {
                 webView.evaluateJavascript(
-                    "(function(){var v=document.querySelector('video');" +
+                    "(function(){window.__jamasUserPaused=false;" +
+                        "var v=document.querySelector('video');" +
                         "if(v&&v.paused&&v.currentTime>0&&!v.ended){" +
                         "v.muted=false;v.play().catch(function(){});return 'resumed';}return 'ok';})()"
                 ) { result ->
@@ -613,7 +701,7 @@ class MainActivity : Activity() {
             }
             setBackgroundColor(0xFF111111.toInt())
             background = GradientDrawable().apply { cornerRadius = dp(8).toFloat() }
-            elevation = dp(6).toFloat()
+            elevation = dp(16).toFloat()
             visibility = View.GONE
             // Arrastrar la burbuja por la pantalla (margenes relativos al borde
             // inferior-izquierdo, que es donde esta anclada por la gravedad).
@@ -814,12 +902,13 @@ class MainActivity : Activity() {
     /** Pantalla completa de reproduccion: volver desde la WebView en pantalla completa. */
     private fun hideCustomView() {
         val v = customView ?: return
-        (findViewById<ViewGroup>(android.R.id.content))?.removeView(v)
+        root.removeView(v)
         customView = null
         customViewCallback?.onCustomViewHidden()
         customViewCallback = null
-        settingsButton.visibility = View.VISIBLE
-        showSystemBars()
+        bottomNav.visibility = View.VISIBLE
+        // Re-ocultar barras inmediatamente (no mostrarlas nunca)
+        mainHandler.post { hideSystemBars() }
     }
 
     /** Navegacion hacia atras unificada (back predictivo en 13+ y clasico en el resto). */
@@ -860,14 +949,47 @@ class MainActivity : Activity() {
         mainHandler.removeCallbacks(playbackWatcher)
         mainHandler.removeCallbacks(memoryMonitorRunnable)
         mainHandler.removeCallbacks(bgKeepAliveRunnable)
+        val svc = backgroundService
+        // Si el servicio reporta que esta reproduciendo, o si el ultimo
+        // reporte de playing fue hace menos de 10 segundos (race condition
+        // con buffering/track changes), NO lo detenemos.
+        val lastPlay = svc?.lastPlayingTimestamp ?: 0L
+        val recentlyPlaying = lastPlay > 0 && (System.currentTimeMillis() - lastPlay) < 10_000
+        if (svc != null && (svc.isPlaying || recentlyPlaying)) {
+            // Servicio sigue vivo, solo nullear el callback para que no
+            // intente acceder a la activity destruida
+            svc.onMediaAction = null
+        } else if (svc != null) {
+            svc.stopForeground(android.app.Service.STOP_FOREGROUND_REMOVE)
+            svc.stopSelf()
+            svc.onMediaAction = null
+        }
         unbindBackgroundService()
+        // Limpiar miniWebView
+        val mw = miniWebView
+        miniWebView = null
+        if (mw != null) {
+            try { mw.destroy() } catch (_: Exception) {}
+        }
+        // Limpiar customView (pantalla completa)
+        if (customView != null) {
+            hideCustomView()
+        }
+        // Limpiar fatalOverlay
+        if (fatalOverlay != null) {
+            (fatalOverlay?.parent as? ViewGroup)?.removeView(fatalOverlay)
+            fatalOverlay = null
+        }
+        // Detener WebView de forma segura
         try {
             if (::webView.isInitialized) {
+                webView.stopLoading()
+                webView.loadUrl("about:blank")
                 (webView.parent as? ViewGroup)?.removeView(webView)
                 webView.destroy()
             }
         } catch (e: Exception) {
-            // Log basico para evitar OOM durante destroy
+            Log.w(Config.TAG, "Error al destruir WebView", e)
         }
         super.onDestroy()
     }
@@ -875,19 +997,25 @@ class MainActivity : Activity() {
     private fun unbindBackgroundService() {
         if (serviceBound) {
             try {
+                backgroundService?.onMediaAction = null
                 unbindService(serviceConnection)
-                serviceBound = false
             } catch (e: Exception) {
                 Log.w(Config.TAG, "Error al desvincular servicio", e)
             }
+            serviceBound = false
+            backgroundService = null
         }
     }
 
+    /** Modo inmersivo permanente: oculta barras del sistema (navegacion + status)
+     *  para que la app ocupe toda la pantalla como YouTube nativo. */
     private fun setupSystemBars() {
         window.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
-        window.decorView.systemUiVisibility = 0
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        window.decorView.setOnApplyWindowInsetsListener { v, insets -> v.onApplyWindowInsets(insets) }
+        // Activar inmersivo permanente al inicio
+        hideSystemBars()
     }
 
     /** Activa/desactiva FLAG_KEEP_SCREEN_ON segun si hay video reproduciendose. */
@@ -925,10 +1053,14 @@ class MainActivity : Activity() {
      *  padding inferior debe actualizarse; si no, el reproductor de Shorts queda
      *  bajo la barra de navegacion del sistema y no se puede tocar su barra de
      *  progreso ni la descripcion). */
+    /** Aplica el padding de insets segun la pagina actual. En Shorts no
+     *  aplicamos padding inferior porque la bottom nav se oculta y Shorts
+     *  necesita toda la pantalla. El padding superior siempre es 0 porque
+     *  el modo inmersivo oculta la barra de estado. */
     private fun applyInsetsPadding() {
         if (!::root.isInitialized) return
-        val b = if (isShortsPage()) lastInsetBottom else 0
-        root.setPadding(lastInsetLeft, lastInsetTop, lastInsetRight, b)
+        val b = if (isShortsPage()) 0 else lastInsetBottom
+        root.setPadding(0, 0, 0, b)
     }
 
     private fun isShortsPage(): Boolean {
@@ -940,32 +1072,73 @@ class MainActivity : Activity() {
         }
     }
 
-    @Suppress("DEPRECATION")
+    private fun isVideoPage(): Boolean {
+        if (!::webView.isInitialized) return false
+        return try {
+            val u = webView.url ?: return false
+            u.contains("/watch") || u.contains("/shorts/")
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun hideSystemBars() {
-        window.decorView.systemUiVisibility = (
-            View.SYSTEM_UI_FLAG_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                window.insetsController?.let {
+                    it.hide(android.view.WindowInsets.Type.systemBars())
+                    it.systemBarsBehavior =
+                        android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            } catch (_: Exception) {}
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                )
+        }
+        // Resetear insets a 0 despues de ocultar barras (evita franja negra)
+        lastInsetTop = 0
+        lastInsetBottom = 0
+        lastInsetLeft = 0
+        lastInsetRight = 0
+        applyInsetsPadding()
     }
 
     private fun showSystemBars() {
-        window.decorView.systemUiVisibility = 0
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try { window.insetsController?.show(android.view.WindowInsets.Type.systemBars()) } catch (_: Exception) {}
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        }
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
     }
 
+    /** Pagina de error estilo YouTube: icono simple + boton reintentar. */
     private fun showErrorPage(msg: String?) {
         if (!::webView.isInitialized || !webView.isAttachedToWindow) return
         try {
-            val clean = msg?.replace("'", "")?.replace("\"", "") ?: "Sin conexion a Internet"
+            val raw = msg ?: "Sin conexion a Internet"
+            val clean = raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
             val html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>" +
-                "</head><body style='background:#000;color:#fff;font-family:sans-serif;text-align:center;padding-top:90px;'>" +
-                "<h2 style='font-weight:normal'>Sin conexion</h2><p style='color:#999'>$clean</p><br><br>" +
-                "<a href='${Config.HOME_URL}' style='color:#ff0000;font-size:18px;text-decoration:none'>Reintentar</a>" +
+                "<style>body{margin:0;background:#0f0f0f;color:#fff;font-family:'Roboto','YouTube Sans',sans-serif;" +
+                "display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;}" +
+                ".icon{font-size:64px;margin-bottom:16px;opacity:0.8;}" +
+                "h2{font-size:18px;font-weight:400;margin:0 0 8px;}" +
+                "p{font-size:13px;color:#aaa;margin:0 0 24px;max-width:280px;text-align:center;}" +
+                "a{display:inline-block;padding:10px 24px;background:#ff0000;color:#fff;border-radius:20px;" +
+                "text-decoration:none;font-size:14px;font-weight:500;transition:background 0.2s;}" +
+                "a:hover{background:#cc0000;}</style></head><body>" +
+                "<div class='icon'>&#9888;&#65039;</div>" +
+                "<h2>Sin conexion</h2><p>$clean</p>" +
+                "<a href='${Config.HOME_URL}'>Reintentar</a>" +
                 "</body></html>"
             webView.loadData(html, "text/html; charset=utf-8", "utf-8")
         } catch (e: Exception) {
@@ -1081,91 +1254,133 @@ class MainActivity : Activity() {
         dialog.show()
     }
 
+    /** Dialogo de ajustes estilo YouTube: fondo oscuro, bordes redondeados, toggle rojo. */
     private fun showSettings() {
         val dialog = Dialog(this)
-        val pad = dp(20)
+        val pad = dp(22)
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(pad, dp(18), pad, dp(14))
+            setPadding(pad, dp(20), pad, dp(18))
             background = GradientDrawable().apply {
-                setColor(0xFF16161A.toInt())
-                cornerRadius = dp(18).toFloat()
+                setColor(0xFF1A1A1E.toInt())
+                cornerRadius = dp(20).toFloat()
             }
         }
 
-        val title = TextView(this).apply {
-            text = "JamasADS"
-            textSize = 22f
-            setTextColor(Color.WHITE)
-            typeface = Typeface.DEFAULT_BOLD
-        }
-        val subtitle = TextView(this).apply {
-            text = "YouTube sin anuncios"
-            textSize = 13f
-            setTextColor(0xFFB9B9C0.toInt())
+        fun sectionLabel(text: String): TextView {
+            return TextView(this).apply {
+                this.text = text
+                textSize = 11f
+                setTextColor(0xFFAAAAAA.toInt())
+                setPadding(0, dp(12), 0, dp(4))
+                typeface = Typeface.DEFAULT_BOLD
+            }
         }
 
+        fun settingButton(icon: String, label: String, onClick: () -> Unit): TextView {
+            return TextView(this).apply {
+                text = "$icon  $label"
+                textSize = 15f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(14), dp(14), dp(14))
+                background = GradientDrawable().apply {
+                    setColor(0xFF26262B.toInt())
+                    cornerRadius = dp(12).toFloat()
+                }
+                setOnClickListener { onClick() }
+            }
+        }
+
+        // Header
+        col.addView(TextView(this).apply {
+            text = "JamasADS"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+        })
+        col.addView(TextView(this).apply {
+            text = "YouTube sin anuncios"
+            textSize = 12f
+            setTextColor(0xFF888888.toInt())
+            setPadding(0, dp(2), 0, 0)
+        })
+
+        // Bloqueador
+        col.addView(sectionLabel("PROTECCION"))
         val sw = Switch(this).apply {
-            text = "Bloqueador de anuncios"
+            text = "Bloqueador de anuncios activo"
+            textSize = 14f
             isChecked = adBlocker.enabled
             setTextColor(Color.WHITE)
             setOnCheckedChangeListener { _, on -> adBlocker.enabled = on }
         }
+        col.addView(sw, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(4) })
 
         val status = TextView(this).apply {
             text = statusText()
-            textSize = 13f
-            setTextColor(0xFFB9B9C0.toInt())
+            textSize = 12f
+            setTextColor(0xFF888888.toInt())
+            setPadding(0, dp(4), 0, 0)
         }
+        col.addView(status)
 
-        val updateBtn = Button(this).apply {
-            text = "Actualizar listas de filtros"
-            setOnClickListener {
-                isEnabled = false
-                text = "Descargando..."
-                adBlocker.updateLists {
-                    runOnUiThread {
-                        isEnabled = true
-                        text = "Actualizar listas de filtros"
-                        status.text = statusText()
-                        Toast.makeText(this@MainActivity, "Listas actualizadas", Toast.LENGTH_LONG).show()
-                    }
+        // Acciones
+        col.addView(sectionLabel("ACCIONES"))
+        val btnGrid = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        fun gridBtn(icon: String, label: String, onClick: () -> Unit): LinearLayout {
+            val item = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                background = GradientDrawable().apply {
+                    setColor(0xFF26262B.toInt())
+                    cornerRadius = dp(12).toFloat()
+                }
+                setPadding(dp(8), dp(14), dp(8), dp(10))
+                setOnClickListener { onClick() }
+                val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                lp.marginEnd = dp(6)
+                layoutParams = lp
+            }
+            item.addView(TextView(this@MainActivity).apply {
+                text = icon
+                textSize = 22f
+                gravity = Gravity.CENTER
+            })
+            item.addView(TextView(this@MainActivity).apply {
+                text = label
+                textSize = 10f
+                setTextColor(0xFFAAAAAA.toInt())
+                gravity = Gravity.CENTER
+                setPadding(0, dp(4), 0, 0)
+            })
+            return item
+        }
+        btnGrid.addView(gridBtn("\uD83C\uDFE0", "Inicio") {
+            webView.loadUrl(Config.HOME_URL)
+            dialog.dismiss()
+        })
+        btnGrid.addView(gridBtn("\uD83D\uDD04", "Recargar") {
+            webView.reload()
+            dialog.dismiss()
+        })
+        btnGrid.addView(gridBtn("\u2B07\uFE0F", "Actualizar") {
+            adBlocker.updateLists {
+                runOnUiThread {
+                    status.text = statusText()
+                    Toast.makeText(this@MainActivity, "Listas actualizadas", Toast.LENGTH_SHORT).show()
                 }
             }
-        }
+        })
+        col.addView(btnGrid, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(4) })
 
-        val homeBtn = Button(this).apply {
-            text = "Volver al inicio"
-            setOnClickListener {
-                webView.loadUrl(Config.HOME_URL)
-                dialog.dismiss()
-            }
-        }
-
-        val reloadBtn = Button(this).apply {
-            text = "Recargar pagina"
-            setOnClickListener {
-                webView.reload()
-                dialog.dismiss()
-            }
-        }
-
-        fun addView(v: View, topMargin: Int) {
-            col.addView(v, LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { this.topMargin = dp(topMargin) })
-        }
-
-        addView(title, 0)
-        addView(subtitle, 4)
-        addView(sw, 16)
-        addView(status, 8)
-        addView(updateBtn, 16)
-        addView(homeBtn, 8)
-        addView(reloadBtn, 8)
-
-        val width = (resources.displayMetrics.widthPixels * 0.9).toInt()
+        val width = (resources.displayMetrics.widthPixels * 0.88).toInt()
         dialog.setContentView(col, ViewGroup.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT))
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         dialog.show()
@@ -1187,6 +1402,177 @@ class MainActivity : Activity() {
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    private fun createSettingsButton(): ImageView {
+        return ImageView(this).apply {
+            setImageResource(R.drawable.ic_settings)
+            setColorFilter(Color.WHITE)
+            scaleType = ImageView.ScaleType.CENTER
+            setPadding(dp(9), dp(9), dp(9), dp(9))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(0xCC1A1A1F.toInt())
+                setStroke(dp(1), 0x33FFFFFF.toInt())
+            }
+            setOnClickListener { showSettings() }
+            elevation = dp(8).toFloat()
+        }
+    }
+
+    /** Boton glass (casita + flecha) para volver a inicio desde Shorts. */
+    private fun createShortsHomeButton(): ImageView {
+        return ImageView(this).apply {
+            setImageResource(R.drawable.ic_shorts_home)
+            setColorFilter(Color.WHITE)
+            scaleType = ImageView.ScaleType.CENTER
+            setPadding(dp(9), dp(9), dp(9), dp(9))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(0xCC1A1A1F.toInt())
+                setStroke(dp(1), 0x33FFFFFF.toInt())
+            }
+            contentDescription = "Volver a inicio"
+            setOnClickListener {
+                if (::webView.isInitialized) {
+                    if (webView.canGoBack()) {
+                        webView.goBack()
+                    } else {
+                        webView.loadUrl(Config.HOME_URL)
+                    }
+                }
+            }
+            elevation = dp(8).toFloat()
+        }
+    }
+
+    /** Barra de navegacion inferior estilo YouTube nativo con efecto glass. */
+    private fun createBottomNav(): LinearLayout {
+        data class NavTab(val iconRes: Int, val label: String, val url: String)
+
+        val tabs = listOf(
+            NavTab(R.drawable.ic_nav_home, "Inicio", Config.HOME_URL),
+            NavTab(R.drawable.ic_nav_shorts, "Shorts", "https://m.youtube.com/shorts"),
+            NavTab(R.drawable.ic_nav_search, "Buscar", ""),
+            NavTab(R.drawable.ic_nav_subs, "Suscripciones", "https://m.youtube.com/feed/subscriptions"),
+            NavTab(R.drawable.ic_nav_library, "Biblioteca", "https://m.youtube.com/feed/library")
+        )
+
+        val activeColor = Color.WHITE
+        val inactiveColor = 0xFF8A8A8A.toInt()
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = GradientDrawable().apply {
+                setColor(0xF2111116.toInt())
+                setStroke(1, 0x1AFFFFFF.toInt())
+            }
+            elevation = dp(12).toFloat()
+            setPadding(0, dp(6), 0, dp(4))
+        }
+
+        val iconViews = mutableListOf<ImageView>()
+        val labelViews = mutableListOf<TextView>()
+
+        fun selectTab(index: Int) {
+            for (i in iconViews.indices) {
+                val sel = i == index
+                iconViews[i].setColorFilter(if (sel) activeColor else inactiveColor)
+                labelViews[i].setTextColor(if (sel) activeColor else inactiveColor)
+                labelViews[i].typeface = if (sel) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            }
+        }
+
+        tabs.forEachIndexed { index, tab ->
+            val tabView = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+                isClickable = true
+                isFocusable = true
+            }
+
+            val icon = ImageView(this@MainActivity).apply {
+                setImageResource(tab.iconRes)
+                layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    topMargin = dp(4)
+                    bottomMargin = dp(2)
+                }
+                setColorFilter(inactiveColor)
+            }
+
+            val label = TextView(this@MainActivity).apply {
+                text = tab.label
+                textSize = 10f
+                gravity = Gravity.CENTER
+                setTextColor(inactiveColor)
+                maxLines = 1
+                setPadding(0, 0, 0, dp(2))
+            }
+
+            iconViews.add(icon)
+            labelViews.add(label)
+            tabView.addView(icon)
+            tabView.addView(label)
+
+            tabView.setOnClickListener {
+                selectTab(index)
+                if (tab.label == "Buscar") {
+                    // El buscador de YouTube mobile no se abre con un click
+                    // programatico (YouTube exige un gesto real y lo ignora), y en
+                    // watch el boton del topbar queda tapado por el player. Por eso
+                    // usamos un dialogo NATIVO: el usuario escribe y navegamos a la
+                    // pagina de resultados de YouTube.
+                    showSearchDialog()
+                } else {
+                    webView.loadUrl(tab.url)
+                }
+            }
+            container.addView(tabView)
+        }
+
+        selectTab(0)
+        return container
+    }
+
+    /** Dialogo de busqueda nativo: escribe una consulta y navega a los resultados
+     *  de YouTube. Se usa en la pestana "Buscar" de la bottom nav porque el
+     *  buscador de YouTube mobile no se puede abrir por codigo (exige gesto real). */
+    private fun showSearchDialog() {
+        val input = EditText(this).apply {
+            hint = "Buscar en YouTube"
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+            setTextColor(Color.WHITE)
+            setHintTextColor(0xFF9E9E9E.toInt())
+        }
+        val box = FrameLayout(this).apply {
+            setPadding(dp(24), dp(8), dp(24), 0)
+        }
+        box.addView(
+            input,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Buscar")
+            .setView(box)
+            .setPositiveButton("Buscar") { _, _ ->
+                val q = input.text.toString().trim()
+                if (q.isNotEmpty()) {
+                    val url = "https://m.youtube.com/results?search_query=" +
+                        java.net.URLEncoder.encode(q, "UTF-8")
+                    webView.loadUrl(url)
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .create()
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        dialog.show()
+        input.requestFocus()
+    }
 
     /** Puente JS→Kotlin: el watchdog llama a window.JamasBridge.onPlaybackStateChanged(info)
      *  para comunicar cambios de estado de reproduccion al servicio. */
@@ -1220,6 +1606,31 @@ class MainActivity : Activity() {
                 }
             } catch (e: Exception) {
                 Log.w(Config.TAG, "Error en JamasBridge", e)
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun onFullscreenChanged(isFullscreen: Boolean) {
+            isFullscreenReported = isFullscreen
+            runOnUiThread {
+                if (::bottomNav.isInitialized) {
+                    bottomNav.visibility = if (isFullscreen) View.GONE else {
+                        // restaurar solo si no estamos en Shorts
+                        if (isShortsPage()) View.GONE else View.VISIBLE
+                    }
+                }
+                if (::settingsButton.isInitialized) {
+                    settingsButton.visibility = if (isFullscreen) View.GONE else {
+                        if (isShortsPage() || isVideoPage()) View.GONE else View.VISIBLE
+                    }
+                }
+                if (::shortsHomeButton.isInitialized) {
+                    shortsHomeButton.visibility =
+                        if (isFullscreen || !isShortsPage()) View.GONE else View.VISIBLE
+                }
+                if (isFullscreen) {
+                    hideSystemBars()
+                }
             }
         }
     }

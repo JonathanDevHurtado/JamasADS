@@ -19,15 +19,22 @@
         android:allowBackup="true">
 
         <activity
-            android:name="com.jamasads.app.MainActivity"
+            android:name="com.jamasads.app.SplashActivity"
             android:exported="true"
-            android:launchMode="singleTask"
-            android:enableOnBackInvokedCallback="true"
+            android:theme="@style/Theme.JamasADS.Splash"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+
+        <activity
+            android:name="com.jamasads.app.MainActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:enableOnBackInvokedCallback="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize">
         </activity>
 
         <service

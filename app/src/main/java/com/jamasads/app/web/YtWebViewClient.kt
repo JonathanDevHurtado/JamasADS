@@ -105,8 +105,6 @@ class YtWebViewClient(
             if (rendererCrashStreak >= 3) {
                 onRendererGiveUp()
             } else {
-                // Forzar GC antes de recrear el WebView para liberar memoria
-                System.gc()
                 onRenderProcessGone(view)
             }
         } catch (e: Exception) {
@@ -119,6 +117,7 @@ class YtWebViewClient(
     private fun injectScripts(view: WebView) {
         if (!view.isAttachedToWindow) return
         try {
+            // CSS de bloqueo de anuncios
             val css = adBlocker.cosmeticCss()
             if (css.isNotEmpty()) {
                 val esc = cachedEscapedCss ?: escapeJs(css).also { cachedEscapedCss = it }
@@ -129,6 +128,18 @@ class YtWebViewClient(
                     null
                 )
             }
+            // CSS de mejoras visuales (glassmorphism, comentarios, etc.)
+            val enhCss = cachedEnhancementCss
+            if (enhCss != null) {
+                val escEnh = cachedEscapedEnhCss ?: escapeJs(enhCss).also { cachedEscapedEnhCss = it }
+                view.evaluateJavascript(
+                    "(function(){var old=document.getElementById('jamas-css');if(old)old.remove();" +
+                        "var s=document.createElement('style');s.id='jamas-css';" +
+                        "s.textContent='$escEnh';document.head.appendChild(s);})();",
+                    null
+                )
+            }
+            // Watchdog anti-anuncios + background playback
             val watchdog = cachedWatchdogJs
             if (watchdog != null) {
                 view.evaluateJavascript(watchdog, null)
@@ -172,13 +183,18 @@ class YtWebViewClient(
         private const val TAG = "YtWebViewClient"
         @Volatile private var cachedWatchdogJs: String? = null
         @Volatile private var cachedEscapedCss: String? = null
+        @Volatile private var cachedEnhancementCss: String? = null
+        @Volatile private var cachedEscapedEnhCss: String? = null
 
-        fun invalidateCssCache() { cachedEscapedCss = null }
+        fun invalidateCssCache() { cachedEscapedCss = null; cachedEscapedEnhCss = null }
 
         fun preloadAssets(context: Context) {
             try {
                 if (cachedWatchdogJs == null) {
                     cachedWatchdogJs = context.assets.open("js/watchdog.js").bufferedReader().use { it.readText() }
+                }
+                if (cachedEnhancementCss == null) {
+                    cachedEnhancementCss = context.assets.open("css/enhancements.css").bufferedReader().use { it.readText() }
                 }
             } catch (_: Exception) {}
         }

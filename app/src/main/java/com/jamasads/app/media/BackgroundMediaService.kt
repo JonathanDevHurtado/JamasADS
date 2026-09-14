@@ -49,6 +49,11 @@ class BackgroundMediaService : Service() {
     private var lastThumbnailUrl: String = ""
     private var currentPosition: Long = 0
     private var currentDuration: Long = 0
+    /** Timestamp del ultimo update de playback con playing=true.
+     *  Evita que onDestroy pare el servicio si el watchdog reporto
+     *  playing=false moments antes de un buffer o cambio de track. */
+    @Volatile var lastPlayingTimestamp: Long = 0L
+        private set
 
     var onMediaAction: ((String) -> Unit)? = null
 
@@ -95,13 +100,12 @@ class BackgroundMediaService : Service() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Reproduccion JamasADS",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "Controles de reproduccion en segundo plano"
                 setShowBadge(false)
             }
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
         }
     }
 
@@ -251,6 +255,7 @@ class BackgroundMediaService : Service() {
 
     fun updatePlaybackState(playing: Boolean, title: String?, artist: String?, position: Long = 0, duration: Long = 0) {
         isPlaying = playing
+        if (playing) lastPlayingTimestamp = System.currentTimeMillis()
         if (title != null) currentTitle = title
         if (artist != null) currentArtist = artist
         currentPosition = position
@@ -268,9 +273,7 @@ class BackgroundMediaService : Service() {
                 conn.connectTimeout = 5000
                 conn.readTimeout = 5000
                 conn.connect()
-                val stream = conn.inputStream
-                val bmp = BitmapFactory.decodeStream(stream)
-                stream.close()
+                val bmp = conn.inputStream.use { BitmapFactory.decodeStream(it) }
                 conn.disconnect()
                 if (bmp != null) {
                     videoThumbnail = Bitmap.createScaledBitmap(bmp, 256, 256, true)
@@ -287,8 +290,8 @@ class BackgroundMediaService : Service() {
     }
 
     private fun updateNotification() {
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(NOTIFICATION_ID, buildNotification())
+        getSystemService(NotificationManager::class.java)
+            ?.notify(NOTIFICATION_ID, buildNotification())
     }
 
     private fun acquireWakeLock() {

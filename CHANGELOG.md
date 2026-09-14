@@ -5,6 +5,43 @@ Todas los cambios notables en JamasADS estan documentados en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/spec/v2.0.0.html).
 
+## [3.0] - 2026-09-14
+
+### Added
+- **Bottom nav nativa** con 5 iconos vectoriales Material (Inicio, Shorts, Buscar, Suscripciones, Biblioteca)
+- **Buscador nativo**: diálogo con `EditText` que navega a la página de resultados de YouTube
+- **Página de vídeo rediseñada**: barra de acciones 2×2 (Like / Dislike / Compartir / Más), fila de canal (avatar + nombre + suscriptores + Suscribirse) y comentarios como tarjetas
+- **Contador real de dislikes** vía la API pública de Return YouTube Dislike
+- **Shorts**: botón nativo "volver a inicio" y detección de pantalla completa
+- **SplashActivity** animado y modo inmersivo permanente
+- Detección de navegación SPA de YouTube (`pushState`/`popstate`)
+
+### Changed
+- CSS acotado por página (`html.jamas-page-*`) en lugar de selectores de escritorio (`ytd-*`)
+- Selectores móviles de `m.youtube.com` (`ytm-*` / `slim-video-*`)
+
+### Fixed
+- **Hueco negro** en la página de vídeo (player `fixed top:48` → `top:0`)
+- **Botones Compartir/Dislike que desaparecían al girar el móvil**: YouTube los elimina del DOM en horizontal y no los repone; al volver a vertical se recarga la página en la misma posición del vídeo
+- Botones que se perdían en los re-render de YouTube (observer acotado + re-aplicación)
+- **Audio que se silenciaba**: `forceAudio()` fuerza `video.muted=false`; se oculta el botón `.ytp-unmute`
+- Logo de YouTube en la pantalla principal
+- Crash por OOM / renderer caído
+
+### Security
+- Contador de dislikes: solo se envía el ID del vídeo a Return YouTube Dislike (una vez por vídeo)
+
+## [2.9] - 2026-09-13
+
+### Fixed
+- `onStop()` mataba el servicio en segundo plano al minimizar
+- `onConsoleMessage` silenciaba errores de consola
+- Guards `isDestroyed/isFinishing` que bloqueaban acciones
+- Crash en `unbindBackgroundService`
+
+### Changed
+- Canal de notificación con `IMPORTANCE_DEFAULT`
+
 ## [2.8] - 2026-09-11
 
 ### Changed

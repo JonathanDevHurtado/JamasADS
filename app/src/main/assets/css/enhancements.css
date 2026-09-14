@@ -1,0 +1,780 @@
+/* =============================================
+   JamasADS v3.0 — YouTube Native App Theme
+   Aplica en TODAS las paginas: home, watch, shorts, search
+   ============================================= */
+
+/* ==== NAV inferior de YouTube: ocultar siempre ==== */
+#bottom-bar, ytm-pivot-bar-renderer, div#pivot-button,
+.shell-icon-shape-container, ytm-bottom-navigation-bar-renderer {
+    display: none !important;
+}
+
+/* ==== SHORTS: dejar que YouTube lo maneje ==== */
+ytd-shorts #masthead-container,
+ytd-shorts .ytd-masthead,
+ytd-shorts #logo-container,
+ytd-shorts #masthead-logo,
+ytd-shorts #guide-icon,
+ytd-reel-player-overlay-renderer #masthead-container,
+ytd-reel-player-overlay-renderer ytd-masthead {
+    display: none !important;
+    visibility: hidden !important;
+}
+ytd-shorts.ytd-page-manager {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+ytd-shorts #shorts-container {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+}
+body.ytd-shorts, ytd-shorts body {
+    overflow: hidden !important;
+}
+
+/* =====================================================
+   HEADER EN PAGINAS DE VIDEO — SOLO BOTON RETROCESO
+   Ocultamos TODO excepto el boton de retroceso
+   ===================================================== */
+
+/* Fondo del header en watch */
+#masthead-container,
+ytd-masthead#masthead,
+ytm-masthead#masthead {
+    background: rgba(15,15,15,0.98) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+}
+
+/* ---- Logo de YouTube: SIEMPRE ocultar en watch ---- */
+#logo-container,
+#logo,
+.yt-spec-touch-feedback-shape--touch-response-opacity-100[href="/"],
+#masthead-logo,
+a#logo,
+ytd-masthead #logo,
+ytm-masthead #logo {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* ---- Buscador: ocultar siempre en watch ---- */
+#search-form,
+#search-icon,
+#search-container,
+ytd-searchbox,
+ytd-masthead ytd-searchbox,
+#center,
+#container.ytd-searchbox,
+form#search-form,
+#search-input,
+ytm-search-box,
+ytm-masthead #search-button {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* ---- 3 puntitos / menu: ocultar en watch ---- */
+#buttons,
+ytd-masthead #buttons,
+#right,
+ytd-masthead #right,
+ytm-masthead #right,
+ytd-masthead button#button,
+.yyt-masthead (#buttons),
+ytd-topbar-menu-button-renderer,
+ytm-masthead-renderer #buttons {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* ---- Boton de retroceso: SIEMPRE visible ---- */
+#guide-icon,
+ytd-masthead #guide-icon,
+ytm-masthead #guide-icon,
+#guide-button,
+ytm-masthead #guide-button {
+    display: flex !important;
+    visibility: visible !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* =====================================================
+   PLAYER DE VIDEO — 100% NATIVO
+   ===================================================== */
+
+/* Gradiente superior e inferior */
+.ytp-chrome-top {
+    background: linear-gradient(rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 50%, transparent 100%) !important;
+    padding: 12px 12px 20px !important;
+}
+.ytp-chrome-bottom {
+    background: linear-gradient(transparent 0%, rgba(0,0,0,0.35) 20%, rgba(0,0,0,0.85) 100%) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    padding: 20px 12px 8px !important;
+}
+
+/* Barra de progreso */
+.ytp-progress-bar-container {
+    height: 3px !important;
+    transition: height 0.2s cubic-bezier(0.4,0,0.2,1) !important;
+}
+.ytp-progress-bar-container:hover,
+.ytp-progress-bar-container.ytp-hover {
+    height: 6px !important;
+}
+.ytp-progress-bar-container .ytp-progress-bar {
+    border-radius: 3px !important;
+}
+.ytp-scrubber-container {
+    opacity: 0 !important;
+    transition: opacity 0.2s ease !important;
+}
+.ytp-progress-bar-container:hover .ytp-scrubber-container,
+.ytp-progress-bar-container.ytp-hover .ytp-scrubber-container {
+    opacity: 1 !important;
+}
+.ytp-scrubber-dot {
+    width: 16px !important;
+    height: 16px !important;
+    border-radius: 50% !important;
+    background: #fff !important;
+    border: 2px solid rgba(255,255,255,0.9) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.6) !important;
+}
+
+/* Botones del player */
+.ytp-button {
+    border-radius: 50% !important;
+    transition: background 0.2s ease !important;
+    color: #fff !important;
+}
+.ytp-button:hover {
+    background: rgba(255,255,255,0.12) !important;
+}
+.ytp-button svg, .tp-button img {
+    fill: #fff !important;
+    filter: none !important;
+}
+.ytp-play-button {
+    width: 48px !important;
+    height: 48px !important;
+}
+.ytp-large-play-button {
+    border-radius: 24px !important;
+    background: rgba(0,0,0,0.6) !important;
+    backdrop-filter: blur(8px) !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4) !important;
+    border: none !important;
+}
+.ytp-large-play-button svg {
+    fill: #fff !important;
+}
+
+/* Tiempo */
+.ytp-time-display {
+    font-family: 'Roboto', sans-serif !important;
+    font-size: 13px !important;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.6) !important;
+}
+.ytp-time-current { color: #fff !important; }
+.ytp-time-separator { color: rgba(255,255,255,0.5) !important; }
+.ytp-time-duration { color: rgba(255,255,255,0.5) !important; }
+
+/* Menu de configuracion */
+.ytp-settings-menu {
+    background: rgba(28,28,30,0.96) !important;
+    backdrop-filter: blur(32px) !important;
+    -webkit-backdrop-filter: blur(32px) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6) !important;
+    padding: 6px 0 !important;
+}
+.ytp-settings-menu .ytp-menuitem {
+    padding: 12px 24px !important;
+    font-size: 14px !important;
+    font-family: 'Roboto', sans-serif !important;
+}
+.ytp-settings-menu .ytp-menuitem:hover {
+    background: rgba(255,255,255,0.08) !important;
+}
+.ytp-settings-menu .ytp-menuitem-toggle-checkbox {
+    background-color: #ff0000 !important;
+    border-color: #ff0000 !important;
+}
+
+/* Saltar anuncio */
+.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button {
+    background: rgba(255,255,255,0.95) !important;
+    color: #0f0f0f !important;
+    border-radius: 24px !important;
+    padding: 10px 28px !important;
+    font-weight: 500 !important;
+    font-size: 14px !important;
+    font-family: 'Roboto', sans-serif !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
+}
+
+/* =====================================================
+   AREA BAJO EL VIDEO — COMO APP NATIVA
+   ===================================================== */
+
+/* Titulo */
+#title.ytd-watch-metadata, h1.title.ytd-watch-metadata,
+#above-the-fold.ytd-watch-metadata {
+    font-size: 18px !important;
+    font-weight: 500 !important;
+    line-height: 24px !important;
+    color: #f1f1f1 !important;
+    margin: 8px 0 4px !important;
+    padding: 0 16px !important;
+    font-family: 'Roboto', sans-serif !important;
+}
+
+/* Canal */
+#owner.ytd-watch-metadata, ytd-video-owner-renderer {
+    padding: 8px 16px !important;
+}
+#channel-name #text.ytd-channel-name a,
+#channel-name yt-formatted-string a {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: #f1f1f1 !important;
+}
+#owner-sub-count.ytd-video-owner-renderer {
+    font-size: 12px !important;
+    color: #aaa !important;
+}
+
+/* Suscribirse */
+ytd-subscribe-button-renderer yt-button-shape button,
+ytd-subscribe-button-renderer button {
+    background: #cc0000 !important;
+    color: #fff !important;
+    border-radius: 20px !important;
+    padding: 8px 20px !important;
+    font-weight: 500 !important;
+    font-size: 14px !important;
+    border: none !important;
+}
+ytd-subscribe-button-renderer[subscribed] yt-button-shape button {
+    background: rgba(255,255,255,0.1) !important;
+    color: #f1f1f1 !important;
+}
+
+/* Barra de acciones: glass pill nativo */
+#actions.ytd-watch-metadata,
+ytd-menu-renderer.ytd-watch-metadata,
+#top-level-buttons-computed,
+ytd-watch-metadata #actions {
+    border-radius: 24px !important;
+    background: rgba(255,255,255,0.08) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    padding: 6px 8px !important;
+    margin: 8px 12px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-around !important;
+    min-height: 48px !important;
+}
+#actions.ytd-watch-metadata button,
+ytd-menu-renderer button,
+ytd-toggle-button-renderer button,
+#top-level-buttons-computed button {
+    border-radius: 20px !important;
+    padding: 8px 4px !important;
+    font-size: 12px !important;
+    font-family: 'Roboto', sans-serif !important;
+    background: transparent !important;
+    color: #f1f1f1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 2px !important;
+}
+#actions.ytd-watch-metadata button:hover,
+ytd-menu-renderer button:hover,
+#top-level-buttons-computed button:hover {
+    background: rgba(255,255,255,0.1) !important;
+}
+ytd-toggle-button-renderer[is-selected] button,
+#segmented-like-button[is-selected] button {
+    color: #3ea6ff !important;
+}
+
+/* Descripcion */
+#description.ytd-watch-metadata, ytd-text-inline-expander {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    border-radius: 12px !important;
+    margin: 8px 12px !important;
+    padding: 12px !important;
+}
+#expand {
+    color: #3ea6ff !important;
+    font-weight: 500 !important;
+    border: none !important;
+    background: none !important;
+}
+#info-strings.ytd-watch-metadata {
+    font-size: 12px !important;
+    color: #aaa !important;
+    margin: 4px 16px 0 !important;
+}
+
+/* =====================================================
+   COMENTARIOS — ESTILO NATIVO
+   ===================================================== */
+ytd-comments#comments {
+    margin-top: 16px !important;
+    padding: 0 12px !important;
+}
+#count.ytd-comments {
+    font-weight: 500 !important;
+    color: #f1f1f1 !important;
+    padding: 8px 4px !important;
+}
+ytd-comment-thread-renderer {
+    border-radius: 12px !important;
+    padding: 10px !important;
+    margin: 6px 0 !important;
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid rgba(255,255,255,0.04) !important;
+}
+ytd-comment-thread-renderer:hover {
+    background: rgba(255,255,255,0.06) !important;
+}
+#author-text.ytd-comment-renderer {
+    font-weight: 500 !important;
+    color: #f1f1f1 !important;
+    font-size: 13px !important;
+}
+#published-time-text a {
+    color: #aaa !important;
+    font-size: 11px !important;
+}
+#content-text.ytd-comment-renderer {
+    color: #e1e1e1 !important;
+    line-height: 20px !important;
+    font-size: 13px !important;
+}
+#vote-count-middle {
+    color: #aaa !important;
+    font-size: 11px !important;
+}
+#simple-box-placeholder, #contenteditable-root, #placeholder-area {
+    border-radius: 24px !important;
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+}
+#sort-menu {
+    border-radius: 20px !important;
+    background: rgba(255,255,255,0.06) !important;
+}
+
+/* =====================================================
+   VIDEOS RELACIONADOS — ESTILO APP NATIVA
+   ===================================================== */
+ytd-compact-video-renderer {
+    border-radius: 12px !important;
+    padding: 8px !important;
+    margin: 4px 0 !important;
+    background: rgba(255,255,255,0.02) !important;
+}
+ytd-compact-video-renderer:hover {
+    background: rgba(255,255,255,0.06) !important;
+}
+ytd-thumbnail a, ytd-thumbnail yt-image img,
+ytd-compact-video-renderer ytd-thumbnail {
+    border-radius: 12px !important;
+    overflow: hidden !important;
+}
+ytd-thumbnail-overlay-time-status-renderer {
+    border-radius: 4px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+}
+#video-title.ytd-compact-video-renderer,
+#video-title.ytd-rich-grid-media {
+    font-size: 14px !important;
+    line-height: 20px !important;
+    color: #f1f1f1 !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+}
+#video-title.ytd-compact-video-renderer:hover {
+    color: #fff !important;
+}
+.ytd-channel-name #text.ytd-compact-video-renderer,
+ytd-compact-video-renderer .ytd-channel-name a {
+    font-size: 12px !important;
+    color: #aaa !important;
+}
+
+/* =====================================================
+   THUMBNAILS, VIDEOS, CHIPS
+   ===================================================== */
+ytd-rich-grid-media #thumbnail ytd-thumbnail {
+    border-radius: 12px !important;
+    overflow: hidden !important;
+}
+#chips-wrapper { border-bottom: none !important; padding: 8px 12px !important; }
+yt-chip-cloud-chip-renderer { border-radius: 8px !important; }
+yt-chip-cloud-chip-renderer[aria-selected="true"] {
+    background: rgba(255,255,255,0.18) !important;
+    font-weight: 500 !important;
+}
+
+/* =====================================================
+   SCROLLBAR
+   ===================================================== */
+::-webkit-scrollbar { width: 3px !important; }
+::-webkit-scrollbar-track { background: transparent !important; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12) !important; border-radius: 2px !important; }
+
+/* =====================================================
+   GENERAL
+   ===================================================== */
+html, body, ytd-app {
+    background-color: #0f0f0f !important;
+    font-family: 'Roboto', sans-serif !important;
+}
+video { object-fit: contain !important; }
+
+/* =====================================================
+   WATCH MOBILE (m.youtube.com) — UI nativa premium
+   Solo en paginas de video: html.jamas-page-watch
+   La clase la pone el watchdog en <html>/<body>/<ytm-app>.
+   ===================================================== */
+
+/* --- Player fijo y masthead: ESTABLE via CSS (sin parpadeo).
+   El player de m.youtube.com es position:fixed; lo subimos a top:0 y
+   ocultamos el masthead vacio. Al hacerlo con CSS !important no hay
+   oscilacion (el JS lo re-aplicaba cada 1,5 s y el video saltaba). --- */
+html.jamas-page-watch .player-container.sticky-player,
+html.jamas-page-watch .player-container {
+    top: 0 !important;
+}
+/* NO usar display:none en el masthead: eso deja inservible el buscador
+   (el boton/overlay de busqueda vive ahi). Lo dejamos renderizado con
+   z-index bajo: el player (z=2) lo tapa igual y no hay hueco. */
+html.jamas-page-watch ytm-masthead,
+html.jamas-page-watch ytm-masthead#masthead {
+    z-index: 1 !important;
+}
+
+/* --- Seccion de metadatos: mas aire (separada del video) --- */
+html.jamas-page-watch ytm-slim-video-metadata-section-renderer {
+    padding: 16px 14px 8px !important;
+    background: #0f0f0f !important;
+}
+
+/* --- Cabecera (titulo + fila de canal/stats) con separador --- */
+html.jamas-page-watch .slim-video-metadata-header {
+    padding-bottom: 8px !important;
+    margin-bottom: 10px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
+}
+
+/* --- Titulo: maximo 2 lineas, tipografia nativa --- */
+html.jamas-page-watch .slim-video-information-title,
+html.jamas-page-watch h2.slim-video-information-title,
+html.jamas-page-watch .slim-video-metadata-header h2 {
+    font-size: 17px !important;
+    font-weight: 600 !important;
+    line-height: 1.34 !important;
+    letter-spacing: -0.2px !important;
+    color: #f1f1f1 !important;
+    white-space: normal !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+}
+
+/* --- Barra de acciones: GRID de 6 columnas ---
+   Se usan 6 columnas iguales (minmax(0,1fr)) para que NINGUN boton pueda
+   estirar su columna. Asi las 4 tarjetas quedan del mismo ancho y nada se
+   desborda a la derecha:
+     fila 1 = avatar(1) | nombre+subs(2-4) | Suscribirse(5-6)
+     fila 2 = [ Like (1-3) ] [ Dislike (4-6) ]
+     fila 3 = [ Compartir (1-3) ] [ Mas (4-6) ] */
+html.jamas-page-watch .slim-video-action-bar-actions {
+    display: grid !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    grid-template-rows: auto auto auto !important;
+    row-gap: 14px !important;
+    column-gap: 8px !important;
+    align-items: center !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 6px 12px 14px !important;
+    min-height: 0 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+/* El <script> JSON-LD no debe ocupar celda */
+html.jamas-page-watch .slim-video-action-bar-actions > script {
+    display: none !important;
+}
+
+html.jamas-page-watch .jamas-ab-owner {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    justify-self: start !important;
+    min-width: 0 !important;
+}
+html.jamas-page-watch .jamas-channel-block {
+    grid-column: 2 / span 3 !important;
+    grid-row: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    line-height: 1.2 !important;
+}
+html.jamas-page-watch .jamas-channel-name {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: #f1f1f1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+html.jamas-page-watch .jamas-channel-subs {
+    font-size: 12px !important;
+    color: #aaaaaa !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+html.jamas-page-watch .jamas-ab-sub {
+    grid-column: 5 / span 2 !important;
+    grid-row: 1 !important;
+    justify-self: end !important;
+    min-width: 0 !important;
+}
+
+/* Bloque 2x2: cada tarjeta ocupa media barra */
+html.jamas-page-watch .jamas-ab-like {
+    grid-column: 1 / span 3 !important;
+    grid-row: 2 !important;
+}
+html.jamas-page-watch .jamas-ab-dislike {
+    grid-column: 4 / span 3 !important;
+    grid-row: 2 !important;
+}
+html.jamas-page-watch .jamas-ab-share {
+    grid-column: 1 / span 3 !important;
+    grid-row: 3 !important;
+}
+html.jamas-page-watch .jamas-ab-more {
+    grid-column: 4 / span 3 !important;
+    grid-row: 3 !important;
+}
+
+/* Filas 2 y 3: bloque 2x2 de tarjetas (like/dislike, compartir/mas) */
+html.jamas-page-watch .jamas-ab-tile {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.07) !important;
+    border-radius: 16px !important;
+    min-height: 44px !important;
+    min-width: 0 !important;
+    padding: 0 14px !important;
+    overflow: hidden !important;
+    transition: background 0.15s ease !important;
+    /* El boton de like de YouTube trae margin-left:auto + ancho ajustado al
+       contenido y se pegaba a la derecha de su celda. Lo forzamos a ocupar
+       toda la celda (pegado a la izquierda). */
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    justify-self: stretch !important;
+}
+html.jamas-page-watch .jamas-ab-tile:active {
+    background: rgba(255, 255, 255, 0.16) !important;
+}
+
+/* Contadores de like / dislike */
+html.jamas-page-watch .jamas-ab-like[data-count]::after,
+html.jamas-page-watch .jamas-ab-dislike[data-count]::after {
+    content: attr(data-count) !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #f1f1f1 !important;
+}
+/* Etiquetas de compartir / mas */
+html.jamas-page-watch .jamas-ab-share::after {
+    content: "Compartir" !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #f1f1f1 !important;
+}
+html.jamas-page-watch .jamas-ab-more::after {
+    content: "Más" !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #f1f1f1 !important;
+}
+
+/* Cadena interna del boton: centrar y neutralizar el pill de YouTube.
+   El icono de "like" es una animacion Lottie que se posiciona con
+   transform; si el boton se colapsa, el svg se desplaza -12px y queda
+   fuera de la tarjeta. Forzamos flex centrado en toda la cadena. */
+html.jamas-page-watch .jamas-ab-tile toggle-button-view-model,
+html.jamas-page-watch .jamas-ab-tile button-view-model,
+html.jamas-page-watch .jamas-ab-tile button,
+html.jamas-page-watch .jamas-ab-tile .ytSpecButtonShapeNextIconButton,
+html.jamas-page-watch .jamas-ab-tile animated-icon,
+html.jamas-page-watch .jamas-ab-tile lottie-component {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+}
+html.jamas-page-watch .jamas-ab-tile svg {
+    position: static !important;
+    transform: none !important;
+    top: auto !important;
+    left: auto !important;
+    margin: 0 !important;
+    width: 22px !important;
+    height: 22px !important;
+    display: block !important;
+}
+
+/* --- Boton de "activar sonido" (blanco): fuera --- */
+html.jamas-page-watch .ytp-unmute,
+html.jamas-page-watch .ytp-unmute-box,
+html.jamas-page-watch .ytp-unmute-icon,
+html.jamas-page-watch .ytp-unmute-inner {
+    display: none !important;
+}
+
+/* --- Avatar del canal redondeado y mas grande --- */
+html.jamas-page-watch .slim-video-owner-icon,
+html.jamas-page-watch ytm-profile-icon.slim-profile-icon,
+html.jamas-page-watch ytm-profile-icon img {
+    border-radius: 50% !important;
+    overflow: hidden !important;
+}
+html.jamas-page-watch .jamas-ab-owner ytm-profile-icon,
+html.jamas-page-watch .jamas-ab-owner ytm-profile-icon img {
+    width: 44px !important;
+    height: 44px !important;
+}
+
+/* --- Boton Suscribirse: pill roja --- */
+html.jamas-page-watch ytm-subscribe-button-renderer button,
+html.jamas-page-watch .slim-subscribe-button button,
+html.jamas-page-watch .slim-subscribe-button .yt-spec-button-shape-next {
+    background: #ff0033 !important;
+    color: #ffffff !important;
+    border-radius: 20px !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    padding: 0 16px !important;
+    min-height: 36px !important;
+    border: none !important;
+}
+
+/* --- Comentarios: tarjeta redondeada --- */
+html.jamas-page-watch ytm-comment-section-renderer,
+html.jamas-page-watch ytm-comments-section-renderer,
+html.jamas-page-watch ytm-comment-section,
+html.jamas-page-watch #comments {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    border-radius: 16px !important;
+    margin: 8px 12px 12px !important;
+    padding: 2px 4px !important;
+    overflow: hidden !important;
+}
+html.jamas-page-watch .ytCommentsEntryPointTeaserViewModelHost {
+    padding: 10px 12px !important;
+    border-radius: 14px !important;
+}
+/* Comentarios cargados: filas con separador y avatar circular */
+html.jamas-page-watch ytm-comment-renderer,
+html.jamas-page-watch ytm-comment-thread-renderer {
+    padding: 12px 14px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+html.jamas-page-watch ytm-comment-renderer img,
+html.jamas-page-watch ytm-comment-thread-renderer img,
+html.jamas-page-watch comments-entry-point-teaser-view-model img,
+html.jamas-page-watch yt-avatar-shape img {
+    border-radius: 50% !important;
+}
+
+/* --- Videos relacionados: thumbnail redondeado.
+   (No tocamos ytm-item-section-renderer: meterle border-radius/margenes
+   rompia los chips de filtro "Todos / ..." que van dentro.) --- */
+html.jamas-page-watch ytm-compact-video-renderer img,
+html.jamas-page-watch ytm-video-with-context-renderer img,
+html.jamas-page-watch .video-thumbnail-container,
+html.jamas-page-watch ytm-thumbnail-overlay {
+    border-radius: 12px !important;
+}
+
+/* --- Chips de filtro de relacionados ---
+   YouTube envuelve los chips en `ytm-related-chip-cloud-renderer`
+   (clase `chips-fixed-positioning`) con `position: fixed` y un `top`
+   calculado (p. ej. 586px) que deja un hueco vacio y los coloca mal.
+   Lo devolvemos al flujo normal para que aparezcan debajo del video,
+   como en YouTube normal. --- */
+html.jamas-page-watch ytm-related-chip-cloud-renderer,
+html.jamas-page-watch .chips-fixed-positioning {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: auto !important;
+}
+html.jamas-page-watch ytm-chip-cloud-renderer,
+html.jamas-page-watch yt-chip-cloud-renderer {
+    position: static !important;
+    padding: 10px 12px !important;
+    margin: 0 !important;
+}
+html.jamas-page-watch ytm-chip-cloud-chip-renderer,
+html.jamas-page-watch yt-chip-cloud-chip-renderer {
+    border-radius: 16px !important;
+    margin-right: 8px !important;
+}

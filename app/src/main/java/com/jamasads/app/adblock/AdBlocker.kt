@@ -59,6 +59,7 @@ class AdBlocker(private val context: Context) {
             readyRef.set(true)
             return
         }
+        // Si no hay cache, compilar en background sin bloquear el main thread
         thread(name = "adblock-compile", isDaemon = true) {
             try {
                 val assets = arrayOf(
@@ -205,7 +206,7 @@ class AdBlocker(private val context: Context) {
             conn.setRequestProperty("User-Agent", Config.CHROME_UA)
             val code = conn.responseCode
             if (code !in 200..299) return null
-            return conn.inputStream.bufferedReader().readText()
+            return conn.inputStream.bufferedReader().use { it.readText() }
         } finally {
             conn.disconnect()
         }
