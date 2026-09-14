@@ -108,7 +108,18 @@ Dispositivo de pruebas: `qc5lnnwwyhy5tcm7` (Xiaomi/MIUI Android 13+).
   rompe la reproducción) y los scriptlets `+js(...)` (no son CSS). Esto está
   cubierto por `FilterCompilerTest` (12 tests).
 - Versionado: `versionCode`/`versionName` en `app/build.gradle.kts`
-  (actual: 32 / "3.0"). Firma con `signing.properties` + `keystore/utubeorigin.jks`
+  (actual: 33 / "3.1"). Firma con `signing.properties` + `keystore/utubeorigin.jks`
+- **Audio en segundo plano (pantalla apagada / jugando)**: MIUI/Doze corta el
+  proceso en segundo plano. El `BackgroundMediaService` (foreground, tipo
+  `mediaPlayback`) mantiene un **WakeLock `PARTIAL_WAKE_LOCK` indefinido**
+  mientras `isPlaying` (se adquiere en `updatePlaybackState`/`handleMediaAction`
+  y se libera al pausar/`onDestroy`); el servicio usa
+  `android:stopWithTask="false"` + `onTaskRemoved`. En los ajustes hay una
+  sección **"Segundo plano"** con *Permitir sin restricciones*
+  (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`) y *Autostart*
+  (`openAutostartSettings()`, componentes de MIUI/ColorOS/EMUI…). Sin la exención
+  de batería MIUI puede matar la app igualmente (se comprueba con
+  `dumpsys deviceidle whitelist`).
 - **La barra de acciones del watch se re-renderiza**: YouTube borra las clases
   `jamas-ab-*`. Se re-aplica al instante con `observeWatchBar()` (MutationObserver
   **solo childList**, throttle 120 ms, sin observar atributos → sin bucle), que
@@ -193,7 +204,9 @@ JamasADS/
 
 ## Estado actual
 
-v3.0 (code 32) - versión estable (UI nativa + fixes del watch):
+v3.1 (code 33) - audio en segundo plano robusto:
+- **Segundo plano**: WakeLock `PARTIAL_WAKE_LOCK` indefinido mientras suena + `android:stopWithTask="false"` + `onTaskRemoved`; sección "Segundo plano" en los ajustes (exención de batería + autostart del fabricante)
+- Version anterior (v3.0, code 32) - versión estable (UI nativa + fixes del watch):
 - **Estructura del repo**: README, LICENSE, CHANGELOG, SECURITY, CONTRIBUTING, CODE_OF_CONDUCT y `.github/workflows/build.yml` en la raíz; `Github/` queda para `apks/`, `logs/` y `versiones/`
 - **Giro del móvil**: al girar a horizontal YouTube **borra Dislike/Más del DOM** y no los repone al volver a vertical → al volver a vertical se **recarga la página en la misma posición del vídeo** (`&t=<s>`) para re-renderizar la barra completa
 - **Masthead** `z-index:1` (renderizado, ya no `display:none`): el player lo tapa sin hueco y no se rompen componentes de YouTube

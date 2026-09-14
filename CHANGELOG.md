@@ -5,6 +5,29 @@ Todas los cambios notables en JamasADS estan documentados en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/spec/v2.0.0.html).
 
+## [3.1] - 2026-09-14
+
+### Added
+- **Reproducción en segundo plano robusta**: la app ahora mantiene la música
+  con la pantalla apagada o mientras usas otra app (juegos).
+- **Sección "Segundo plano"** en los ajustes:
+  - *Permitir sin restricciones*: solicita la exención de optimización de batería
+    (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`), imprescindible en MIUI/Doze.
+  - *Autostart / inicio automático*: abre los ajustes de autostart del fabricante
+    (MIUI, ColorOS, EMUI, etc.).
+
+### Changed
+- **WakeLock indefinido mientras suena** (`PARTIAL_WAKE_LOCK`, sin timeout): se
+  adquiere al reproducir y se libera al pausar o cerrar, en lugar de un lock de
+  1 hora adquirido al crear el servicio.
+- El servicio usa `android:stopWithTask="false"` y `onTaskRemoved`, para no
+  cortarse al cerrar la tarea (swipe).
+
+### Verified
+- Con la app en segundo plano, la posición del vídeo sigue avanzando
+  (`10196 → 14196`); el WakeLock `JamasADS::PlaybackWakeLock` está activo y el
+  servicio en primer plano (`isForeground=true`, tipo `mediaPlayback`).
+
 ## [3.0] - 2026-09-14
 
 ### Added

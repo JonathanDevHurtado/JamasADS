@@ -68,8 +68,14 @@ class BackgroundMediaService : Service() {
         Log.d(TAG, "Servicio creado")
         createNotificationChannel()
         setupMediaSession()
-        acquireWakeLock()
         startForeground(NOTIFICATION_ID, buildNotification())
+    }
+
+    /** La tarea se cierra (swipe) pero seguimos reproduciendo: el servicio no
+     *  se detiene (android:stopWithTask="false") para no cortar la musica. */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.d(TAG, "onTaskRemoved: manteniendo reproduccion en segundo plano")
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -157,6 +163,7 @@ class BackgroundMediaService : Service() {
             "pause" -> false
             else -> isPlaying
         }
+        if (isPlaying) acquireWakeLock() else releaseWakeLock()
         onMediaAction?.invoke(action)
         updateMediaSession()
         updateNotification()
@@ -255,7 +262,12 @@ class BackgroundMediaService : Service() {
 
     fun updatePlaybackState(playing: Boolean, title: String?, artist: String?, position: Long = 0, duration: Long = 0) {
         isPlaying = playing
-        if (playing) lastPlayingTimestamp = System.currentTimeMillis()
+        if (playing) {
+            lastPlayingTimestamp = System.currentTimeMillis()
+            acquireWakeLock()
+        } else {
+            releaseWakeLock()
+        }
         if (title != null) currentTitle = title
         if (artist != null) currentArtist = artist
         currentPosition = position
@@ -294,13 +306,18 @@ class BackgroundMediaService : Service() {
             ?.notify(NOTIFICATION_ID, buildNotification())
     }
 
+    /** WakeLock indefinido mientras suena: mantiene la CPU activa con la
+     *  pantalla apagada para que el WebView siga reproduciendo audio. Se
+     *  libera al pausar o al destruir el servicio. */
     private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
         val powerManager = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
             "JamasADS::PlaybackWakeLock"
         ).apply {
-            acquire(60 * 60 * 1000L)
+            setReferenceCounted(false)
+            acquire()
         }
     }
 

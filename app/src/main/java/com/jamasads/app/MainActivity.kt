@@ -1380,6 +1380,37 @@ class MainActivity : Activity() {
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = dp(4) })
 
+        // Segundo plano: evita que MIUI/Doze corte la musica con la pantalla apagada
+        col.addView(sectionLabel("SEGUNDO PLANO"))
+        val bgState = TextView(this).apply {
+            text = if (isIgnoringBatteryOptimizations())
+                "Exencion de bateria: ACTIVADA" else "Exencion de bateria: DESACTIVADA"
+            textSize = 12f
+            setTextColor(
+                if (isIgnoringBatteryOptimizations()) 0xFF4CAF50.toInt() else 0xFFFF9800.toInt()
+            )
+        }
+        col.addView(bgState)
+        col.addView(settingButton("\uD83D\uDD0B", "Permitir sin restricciones") {
+            requestIgnoreBatteryOptimizations()
+            bgState.text = if (isIgnoringBatteryOptimizations())
+                "Exencion de bateria: ACTIVADA" else "Exencion de bateria: DESACTIVADA"
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(6) })
+        col.addView(settingButton("\uD83D\uDD01", "Autostart / inicio automatico") {
+            openAutostartSettings()
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(6) })
+        col.addView(TextView(this).apply {
+            text = "Activa la exencion de bateria y el autostart para escuchar musica con la " +
+                "pantalla apagada o mientras juegas."
+            textSize = 11f
+            setTextColor(0xFF888888.toInt())
+            setPadding(0, dp(8), 0, 0)
+        })
+
         val width = (resources.displayMetrics.widthPixels * 0.88).toInt()
         dialog.setContentView(col, ViewGroup.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT))
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
@@ -1402,6 +1433,67 @@ class MainActivity : Activity() {
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    /** ¿La app esta exenta de la optimizacion de bateria (Doze)? */
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
+        return try {
+            val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
+            pm.isIgnoringBatteryOptimizations(packageName)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** Pide la exencion de bateria para que MIUI/Doze no corte el audio en 2do plano. */
+    private fun requestIgnoreBatteryOptimizations() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !isIgnoringBatteryOptimizations()) {
+            try {
+                startActivity(
+                    Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                )
+            } catch (e: Exception) {
+                try {
+                    startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                } catch (_: Exception) {
+                    Toast.makeText(this, "Abre los ajustes de bateria manualmente", Toast.LENGTH_SHORT).show()
+                }
+            }
+        } else {
+            Toast.makeText(this, "Ya esta exento de la optimizacion de bateria", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Abre los ajustes de "autostart" del fabricante (MIUI, ColorOS, etc.). */
+    private fun openAutostartSettings() {
+        val candidates = listOf(
+            ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"),
+            ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"),
+            ComponentName("com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"),
+            ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"),
+            ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"),
+            ComponentName("com.samsung.android.lool", "com.samsung.android.sm.ui.battery.BatteryActivity")
+        )
+        for (cn in candidates) {
+            try {
+                startActivity(Intent().setComponent(cn))
+                return
+            } catch (_: Exception) {
+            }
+        }
+        try {
+            startActivity(
+                Intent(
+                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:$packageName")
+                )
+            )
+        } catch (_: Exception) {
+            Toast.makeText(this, "Abre los ajustes de la app manualmente", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     private fun createSettingsButton(): ImageView {
         return ImageView(this).apply {

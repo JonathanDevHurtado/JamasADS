@@ -1,5 +1,17 @@
 # Historial de Versiones - JamasADS
 
+## v3.1 (2026-09-14) — Audio en segundo plano
+- **Música con la pantalla apagada o jugando**: WakeLock `PARTIAL_WAKE_LOCK`
+  indefinido mientras suena (se libera al pausar/cerrar) y servicio con
+  `android:stopWithTask="false"` + `onTaskRemoved` para no cortarse al cerrar la tarea
+- **Sección "Segundo plano" en los ajustes**: botón *Permitir sin restricciones*
+  (exención de batería, `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`) y *Autostart*
+  (abre los ajustes del fabricante: MIUI, ColorOS, EMUI…)
+- Verificado con la app en segundo plano: la posición avanza (`10196 → 14196`),
+  WakeLock activo y servicio en primer plano
+- versionCode 33 / "3.1"
+- APK: `apks/JamasADS-v3.1.apk`
+
 ## v3.0 (2026-09-14) — Versión estable
 - **UI nativa completa**: bottom nav de 5 pestañas (Inicio, Shorts, Buscar,
   Suscripciones, Biblioteca) con iconos Material vectoriales y **buscador nativo**

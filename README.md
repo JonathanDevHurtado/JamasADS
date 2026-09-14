@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Versi%C3%B3n-3.0-blue" alt="Versión 3.0"/>
+  <img src="https://img.shields.io/badge/Versi%C3%B3n-3.1-blue" alt="Versión 3.1"/>
   <img src="https://img.shields.io/badge/Android-7.0%2B-green" alt="Android 7.0+"/>
   <img src="https://img.shields.io/badge/Kotlin-2.0-purple" alt="Kotlin"/>
   <img src="https://img.shields.io/badge/License-MIT-orange" alt="License"/>
@@ -34,7 +34,7 @@ segundo plano y una interfaz nativa.
 | Característica | Descripción |
 |----------------|-------------|
 | **Bloqueo en 3 capas** | Red (`shouldInterceptRequest`), cosmético (CSS) y watchdog (JS) |
-| **Reproducción en 2º plano** | Notificación interactiva con `MediaSession` |
+| **Reproducción en 2º plano** | Música con la pantalla apagada o jugando: `MediaSession` + WakeLock + exención de batería |
 | **Mini-burbuja** | Desliza hacia abajo para seguir escuchando con la pantalla apagada |
 | **Bottom nav nativa** | 5 pestañas Material: Inicio, Shorts, Buscar, Suscripciones, Biblioteca |
 | **Buscador nativo** | Diálogo con `EditText` que navega a los resultados de YouTube |
@@ -177,6 +177,11 @@ lint y build en cada tag `v*`, y publica la release automáticamente.
 
 Resumen; el detalle está en [`CHANGELOG.md`](CHANGELOG.md) y
 [`Github/logs/`](Github/logs/).
+
+### v3.1 — Audio en segundo plano
+- **Música con la pantalla apagada o jugando**: WakeLock indefinido mientras
+  suena y servicio en primer plano que no se corta al cerrar la tarea.
+- **Ajustes "Segundo plano"**: exención de batería y autostart del fabricante.
 
 ### v3.0 — UI nativa + auditoría del watch
 - **Bottom nav nativa** con 5 iconos Material y **buscador nativo**.
